@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, Text, ForeignKey, DateTime
+from sqlalchemy import Column, String, Float, Text, ForeignKey, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -20,6 +20,8 @@ class NegotiationRound(Base):
     customer_request = Column(Text, nullable=True)
     proposed_options = Column(Text, nullable=True)
     selected_option = Column(String, nullable=True)
+    requested_delivery_date = Column(String, nullable=True)
+    line_comments = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Concession(Base):

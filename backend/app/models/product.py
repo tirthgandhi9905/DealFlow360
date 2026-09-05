@@ -1,5 +1,5 @@
 import enum, uuid
-from sqlalchemy import Column, String, Enum, Float, Boolean, Text, DateTime
+from sqlalchemy import Column, String, Enum, Float, Boolean, Text, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -22,6 +22,8 @@ class Product(Base):
     tax_percent = Column(Float, default=0.0)
     is_subscription = Column(Boolean, default=False)
     recurring_interval = Column(String, nullable=True)
+    stock_count = Column(Integer, default=100)
+    category_discount_ceiling = Column(Float, default=10.0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

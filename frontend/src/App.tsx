@@ -18,6 +18,8 @@ import Customers from "@/pages/Customers"
 import CustomerDetail from "@/pages/CustomerDetail"
 import CustomerPortal from "@/pages/CustomerPortal"
 import Settings from "@/pages/Settings"
+import Warehouses from "@/pages/Warehouses"
+import { Toaster } from "@/components/ui/use-toast"
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -47,12 +49,14 @@ export default function App() {
               <Route path="/products" element={<Products />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/customers/:id" element={<CustomerDetail />} />
+              <Route path="/warehouses" element={<Warehouses />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </AppShell>
         } />
       </Routes>
+      <Toaster />
     </>
   )
 }

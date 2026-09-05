@@ -13,7 +13,10 @@ class Subscription(Base):
     plan_name = Column(String, nullable=False)
     cycle = Column(String, default="monthly")
     amount = Column(Float, nullable=False)
+    recurring_total = Column(Float, default=0.0)
+    one_time_total = Column(Float, default=0.0)
     status = Column(String, default="active")
+    start_date = Column(DateTime(timezone=True), server_default=func.now())
     next_billing_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

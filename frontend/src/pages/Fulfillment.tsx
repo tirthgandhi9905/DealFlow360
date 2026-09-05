@@ -162,13 +162,11 @@ export default function Fulfillment() {
       </div>
 
       <div className="glass rounded-xl p-4">
-        {loading ? (
-          <div className="text-center p-8 text-muted-foreground animate-pulse">Loading fulfillment queue...</div>
-        ) : error ? (
+        {error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
           <>
-            <DataTable data={orders} columns={columns} onRowClick={(r) => setSelectedOrder(r)} />
+            <DataTable data={orders} columns={columns} onRowClick={(r) => setSelectedOrder(r)} isLoading={loading} />
             <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
           </>
         )}
@@ -273,8 +271,8 @@ export default function Fulfillment() {
                           <tbody className="divide-y divide-border">
                             {lines.map((l: any, i: number) => (
                               <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                <td className="py-2.5 px-4 font-medium text-foreground">{l.product_id}</td>
-                                <td className="py-2.5 px-4 text-right">{l.allocated_quantity} units</td>
+                                <td className="py-2.5 px-4 font-medium text-foreground">{l.product_name || l.product_sku || l.product_id}</td>
+                                <td className="py-2.5 px-4 text-right">{l.quantity} units</td>
                               </tr>
                             ))}
                           </tbody>

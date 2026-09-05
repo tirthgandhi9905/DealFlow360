@@ -26,7 +26,8 @@ router = APIRouter()
 class CustomerNegotiationRequest(BaseModel):
     customer_request: str
     counter_discount_percent: Optional[float] = None
-    line_level_notes: Optional[str] = None
+    requested_delivery_date: Optional[str] = None
+    line_comments: Optional[dict] = None
 
 
 class SelectNegotiationOptionRequest(BaseModel):
@@ -246,6 +247,8 @@ async def portal_submit_negotiation_request(
         round_number=str(current_round),
         customer_request=f"{payload.customer_request}" + (f" (Counter: {payload.counter_discount_percent}%)" if payload.counter_discount_percent else ""),
         proposed_options=json.dumps(proposals),
+        requested_delivery_date=payload.requested_delivery_date,
+        line_comments=payload.line_comments,
     )
     db.add(round_record)
 

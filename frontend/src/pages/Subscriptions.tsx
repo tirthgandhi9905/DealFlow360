@@ -32,19 +32,7 @@ export default function Subscriptions() {
       if (search) params.search = search
       if (statusFilter) params.status = statusFilter
       
-      const r = await api.get("/billing/subscriptions", { params }).catch(() => {
-        // Fallback mock if backend endpoint is missing/not implemented
-        return {
-          data: {
-            items: [
-              { id: "sub-01", sub_number: "SUB-1004", customer_name: "Acme Corp Ltd.", status: "active", billing_cycle: "monthly", next_bill_date: new Date(Date.now() + 15 * 86400000).toISOString(), recurring_total: 125000, one_time_total: 45000, start_date: new Date(Date.now() - 45 * 86400000).toISOString() },
-              { id: "sub-02", sub_number: "SUB-1005", customer_name: "Globex Inc.", status: "active", billing_cycle: "quarterly", next_bill_date: new Date(Date.now() + 45 * 86400000).toISOString(), recurring_total: 800000, one_time_total: 0, start_date: new Date(Date.now() - 45 * 86400000).toISOString() },
-              { id: "sub-03", sub_number: "SUB-0992", customer_name: "Stark Industries", status: "paused", billing_cycle: "monthly", next_bill_date: null, recurring_total: 55000, one_time_total: 15000, start_date: new Date(Date.now() - 145 * 86400000).toISOString() }
-            ],
-            total: 3
-          }
-        }
-      })
+      const r = await api.get("/subscriptions/", { params })
       
       setSubs(r.data.items || [])
       setTotal(r.data.total || 0)
@@ -72,11 +60,11 @@ export default function Subscriptions() {
   }
 
   const columns = [
-    { header: "Contract #", accessorKey: "sub_number" as const, className: "font-medium text-primary" },
+    { header: "Contract #", accessorKey: "deal_number" as const, className: "font-medium text-primary" },
     { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
-    { header: "Cycle", cell: (r: any) => <span className="capitalize text-muted-foreground">{r.billing_cycle}</span> },
-    { header: "Recurring", cell: (r: any) => <span className="font-semibold text-foreground">{inr(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.billing_cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
-    { header: "Next Bill Date", cell: (r: any) => <span className="text-slate-600 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> {r.next_bill_date ? new Date(r.next_bill_date).toLocaleDateString() : "—"}</span> },
+    { header: "Cycle", cell: (r: any) => <span className="capitalize text-muted-foreground">{r.cycle}</span> },
+    { header: "Recurring", cell: (r: any) => <span className="font-semibold text-foreground">{inr(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
+    { header: "Next Bill Date", cell: (r: any) => <span className="text-slate-600 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> {r.next_billing_date ? new Date(r.next_billing_date).toLocaleDateString() : "—"}</span> },
     { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
     {
       header: "Action",
@@ -91,14 +79,26 @@ export default function Subscriptions() {
     },
   ]
 
-  const handleModify = () => {
-    alert("Modify Subscription: Opening proration configurator...")
+  const handleModify = async () => {
+    try {
+      await api.post(`/subscriptions/${selectedSub.id}/modify-quantity`, { new_quantity: 2 })
+      alert("Subscription modified!")
+      load()
+    } catch(e) {
+      alert("Failed to modify subscription")
+    }
   }
   
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if(confirm("Cancel this subscription? A prorated credit note will be issued for the remaining days in the cycle.")) {
-      alert("Subscription cancelled. Credit note generated.")
-      setSelectedSub({...selectedSub, status: 'cancelled', next_bill_date: null})
+      try {
+        await api.post(`/subscriptions/${selectedSub.id}/cancel`, { immediate: true })
+        alert("Subscription cancelled. Credit note generated.")
+        setSelectedSub(null)
+        load()
+      } catch(e) {
+        alert("Failed to cancel subscription")
+      }
     }
   }
 
@@ -127,13 +127,11 @@ export default function Subscriptions() {
       </div>
 
       <div className="glass rounded-xl p-4">
-        {loading ? (
-          <div className="text-center p-8 text-muted-foreground animate-pulse">Loading subscriptions...</div>
-        ) : error ? (
+        {error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
           <>
-            <DataTable data={subs} columns={columns} />
+            <DataTable data={subs} columns={columns} isLoading={loading} />
             <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
           </>
         )}
@@ -150,7 +148,7 @@ export default function Subscriptions() {
                   <Repeat className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">Contract {selectedSub.sub_number}</h2>
+                  <h2 className="text-xl font-bold text-foreground">Contract {selectedSub.deal_number}</h2>
                   <p className="text-sm text-muted-foreground">Hybrid Billing Detail · {selectedSub.customer_name}</p>
                 </div>
               </div>
@@ -167,12 +165,12 @@ export default function Subscriptions() {
               <div className="grid grid-cols-3 gap-6 mb-8">
                 <div className="bg-white p-4 rounded-xl border border-border shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Billing Cycle</p>
-                  <p className="text-lg font-bold text-foreground capitalize">{selectedSub.billing_cycle}</p>
-                  <p className="text-xs text-slate-500 mt-1">Started: {new Date(selectedSub.start_date).toLocaleDateString()}</p>
+                  <p className="text-lg font-bold text-foreground capitalize">{selectedSub.cycle}</p>
+                  <p className="text-xs text-slate-500 mt-1">Started: {selectedSub.start_date ? new Date(selectedSub.start_date).toLocaleDateString() : "—"}</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-border shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Next Bill Date</p>
-                  <p className="text-lg font-bold text-foreground">{selectedSub.next_bill_date ? new Date(selectedSub.next_bill_date).toLocaleDateString() : "—"}</p>
+                  <p className="text-lg font-bold text-foreground">{selectedSub.next_billing_date ? new Date(selectedSub.next_billing_date).toLocaleDateString() : "—"}</p>
                   <p className="text-xs text-slate-500 mt-1">Amount: {inr(selectedSub.recurring_total)}</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex flex-col justify-center">

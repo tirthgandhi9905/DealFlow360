@@ -6,8 +6,8 @@ from sqlalchemy import select, or_, func
 from pydantic import BaseModel
 from app.database import get_db
 from app.models.product import Product, ProductCategory, PriceList
-from app.auth.dependencies import get_current_user
-from app.models.user import User
+from app.auth.dependencies import get_current_user, require_role
+from app.models.user import User, UserRole
 
 router = APIRouter()
 
@@ -158,7 +158,7 @@ async def get_product(
 async def create_product(
     data: ProductCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES_MANAGER)),
 ):
     existing = await db.execute(select(Product).where(Product.sku == data.sku))
     if existing.scalar_one_or_none():
@@ -189,3 +189,46 @@ async def create_product(
         "cost": product.cost,
         "created_at": product.created_at.isoformat() if product.created_at else None,
     }
+
+
+@router.patch("/{product_id}")
+async def update_product(
+    product_id: UUID,
+    data: ProductUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES_MANAGER)),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "sku" in update_data and update_data["sku"] != product.sku:
+        existing = await db.execute(select(Product).where(Product.sku == update_data["sku"]))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+
+    for key, value in update_data.items():
+        setattr(product, key, value)
+
+    await db.commit()
+    await db.refresh(product)
+    
+    return {"status": "success", "message": f"Product {product_id} updated"}
+
+
+@router.delete("/{product_id}")
+async def delete_product(
+    product_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    await db.delete(product)
+    await db.commit()
+    return {"status": "success", "message": f"Product {product_id} deleted"}

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "react-router-dom"
 import axios from "axios"
 import { Check, X, Download, Building, Phone, Mail, MessageSquare } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 // This page is public — no auth required. Uses raw axios instead of `api` (which auto-injects token & 401 redirects to /login).
 const publicApi = axios.create({ baseURL: "/api" })
@@ -37,7 +38,7 @@ export default function CustomerPortal() {
   useEffect(load, [token])
 
   const submitRequest = async () => {
-    if (!request.trim()) return alert("Describe your request")
+    if (!request.trim()) return toast.error("Describe your request")
     setBusy("submit")
     try {
       const r = await publicApi.post(`/negotiations/portal/quote/${token}/submit-request`, {
@@ -49,7 +50,7 @@ export default function CustomerPortal() {
       setProposal(r.data)
       load()
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to submit request")
+      toast.error(e?.response?.data?.detail || "Failed to submit request")
     } finally {
       setBusy("")
     }
@@ -61,10 +62,10 @@ export default function CustomerPortal() {
       await publicApi.post(`/negotiations/portal/quote/${token}/select-option`, {
         selected_option: label,
       })
-      alert(`Option "${label}" recorded. You can now confirm the quote.`)
+      toast.success(`Option "${label}" recorded. You can now confirm the quote.`)
       load()
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to select option")
+      toast.error(e?.response?.data?.detail || "Failed to select option")
     } finally {
       setBusy("")
     }
@@ -76,10 +77,10 @@ export default function CustomerPortal() {
       const r = await publicApi.post(`/negotiations/portal/quote/${token}/confirm`, {
         comments: "Customer confirmed via portal",
       })
-      alert(r.data.message)
+      toast.success(r.data.message)
       load()
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to confirm")
+      toast.error(e?.response?.data?.detail || "Failed to confirm")
     } finally {
       setBusy("")
     }

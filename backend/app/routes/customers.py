@@ -6,8 +6,8 @@ from sqlalchemy import select, or_, func
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
 from app.models.customer import Customer, CustomerTier
-from app.auth.dependencies import get_current_user
-from app.models.user import User
+from app.auth.dependencies import get_current_user, require_role
+from app.models.user import User, UserRole
 
 router = APIRouter()
 
@@ -113,7 +113,7 @@ async def get_customer(
 async def create_customer(
     data: CustomerCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_REP)),
 ):
     existing = await db.execute(select(Customer).where(Customer.email == data.email))
     if existing.scalar_one_or_none():
@@ -150,7 +150,7 @@ async def update_customer(
     customer_id: UUID,
     data: CustomerUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES_MANAGER, UserRole.SALES_REP)),
 ):
     result = await db.execute(select(Customer).where(Customer.id == customer_id))
     customer = result.scalar_one_or_none()
@@ -186,7 +186,7 @@ async def update_customer(
 async def delete_customer(
     customer_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     result = await db.execute(select(Customer).where(Customer.id == customer_id))
     customer = result.scalar_one_or_none()

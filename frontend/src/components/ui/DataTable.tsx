@@ -13,9 +13,10 @@ interface DataTableProps<T> {
   columns: ColumnDef<T>[];
   onRowClick?: (item: T) => void;
   className?: string;
+  isLoading?: boolean;
 }
 
-export function DataTable<T>({ data, columns, onRowClick, className }: DataTableProps<T>) {
+export function DataTable<T>({ data, columns, onRowClick, className, isLoading }: DataTableProps<T>) {
   return (
     <div className={cn("w-full overflow-auto border border-border rounded-lg bg-surface", className)}>
       <table className="w-full text-sm text-left">
@@ -29,7 +30,17 @@ export function DataTable<T>({ data, columns, onRowClick, className }: DataTable
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {data.length === 0 ? (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`skel-${i}`}>
+                {columns.map((_, j) => (
+                  <td key={`skel-td-${j}`} className="px-4 py-3">
+                    <div className="h-4 bg-slate-200 rounded animate-pulse w-3/4"></div>
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : data.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                 No data available

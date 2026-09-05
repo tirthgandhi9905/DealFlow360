@@ -12,7 +12,8 @@ import {
   Box, 
   Users,
   Settings,
-  Repeat
+  Repeat,
+  Building2
 } from "lucide-react"
 
 const nav = [
@@ -26,6 +27,7 @@ const nav = [
   { label: "Deal Health", path: "/deal-health", icon: HeartPulse },
   { label: "Products", path: "/products", icon: Box },
   { label: "Customers", path: "/customers", icon: Users },
+  { label: "Warehouses", path: "/warehouses", icon: Building2 },
   { label: "Settings", path: "/settings", icon: Settings },
 ]
 

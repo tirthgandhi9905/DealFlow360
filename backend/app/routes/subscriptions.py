@@ -92,8 +92,11 @@ async def list_subscriptions(
             "plan_name": sub.plan_name,
             "cycle": sub.cycle,
             "amount": sub.amount,
+            "recurring_total": getattr(sub, 'recurring_total', sub.amount),
+            "one_time_total": getattr(sub, 'one_time_total', 0),
             "status": sub.status,
             "next_billing_date": sub.next_billing_date.isoformat() if sub.next_billing_date else None,
+            "start_date": getattr(sub, 'start_date', sub.created_at).isoformat() if getattr(sub, 'start_date', sub.created_at) else None,
             "created_at": sub.created_at.isoformat() if sub.created_at else None,
         })
 

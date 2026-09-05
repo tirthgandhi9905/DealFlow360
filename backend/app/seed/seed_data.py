@@ -179,6 +179,8 @@ async def seed():
                 base_price=price, cost=cost, tax_percent=tax,
                 is_subscription=is_sub,
                 recurring_interval="monthly" if is_sub else None,
+                stock_count=random.randint(10, 500) if cat == ProductCategory.HARDWARE else 0,
+                category_discount_ceiling=10.0 if cat == ProductCategory.HARDWARE else 25.0,
                 is_active=True,
             )
             db.add(p)
@@ -484,7 +486,11 @@ async def seed():
                 id=uid(), deal_id=deal.id,
                 customer_id=deal.customer_id, product_id=sp.id,
                 plan_name=sp.name, cycle="monthly",
-                amount=sp.base_price, status="active",
+                amount=sp.base_price,
+                recurring_total=sp.base_price,
+                one_time_total=round(sp.base_price * 0.2, 2),
+                status="active",
+                start_date=deal.created_at,
                 next_billing_date=datetime.utcnow() + timedelta(days=random.randint(1, 30)),
             )
             db.add(sub)
