@@ -156,6 +156,9 @@ async def take_approval_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.SALES_REP:
+        raise HTTPException(status_code=403, detail="Sales Representatives lack approval authority")
+
     appr_res = await db.execute(select(Approval).where(Approval.id == approval_id))
     approval = appr_res.scalar_one_or_none()
     if not approval:
@@ -164,24 +167,41 @@ async def take_approval_action(
     if approval.status != ApprovalStatus.PENDING:
         raise HTTPException(status_code=400, detail="Approval has already been resolved")
 
+    # Determine if it's an endorsement vs full approval
+    is_endorsement = False
+    note = payload.note
+
+    if payload.action == ApprovalStatus.APPROVED:
+        if approval.required_level == "finance":
+            if current_user.role == UserRole.SALES_MANAGER:
+                is_endorsement = True
+                note = "Manager endorsed. Pending Finance Director sign-off"
+            elif current_user.role not in [UserRole.FINANCE, UserRole.ADMIN]:
+                raise HTTPException(status_code=403, detail="Finance role required for this approval")
+        elif approval.required_level == "manager":
+            if current_user.role not in [UserRole.SALES_MANAGER, UserRole.FINANCE, UserRole.ADMIN]:
+                raise HTTPException(status_code=403, detail="Manager role required for this approval")
+
     step = ApprovalStep(
         approval_id=approval.id,
         approver_id=current_user.id,
-        action=payload.action,
-        note=payload.note,
+        action=payload.action if not is_endorsement else ApprovalStatus.PENDING,
+        note=note,
     )
     db.add(step)
 
-    approval.status = payload.action
-    approval.resolved_at = datetime.utcnow()
-
     deal_res = await db.execute(select(Deal).where(Deal.id == approval.deal_id))
     deal = deal_res.scalar_one_or_none()
-    if deal:
-        if payload.action == ApprovalStatus.APPROVED:
-            deal.status = DealStatus.APPROVED
-        elif payload.action == ApprovalStatus.REJECTED:
-            deal.status = DealStatus.CANCELLED
+
+    if not is_endorsement:
+        approval.status = payload.action
+        approval.resolved_at = datetime.utcnow()
+
+        if deal:
+            if payload.action == ApprovalStatus.APPROVED:
+                deal.status = DealStatus.APPROVED
+            elif payload.action == ApprovalStatus.REJECTED:
+                deal.status = DealStatus.CANCELLED
 
     await db.commit()
     await db.refresh(approval)

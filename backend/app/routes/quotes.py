@@ -17,6 +17,7 @@ from app.models.user import User
 from app.core.policies import get_max_discount, get_required_approval_level
 from app.services.risk_engine import compute_total_risk
 from app.services.upsell_engine import get_upsell_candidates
+from app.services.digital_twin import simulate_deal_change, find_better_deal
 
 router = APIRouter()
 
@@ -38,6 +39,37 @@ class CreateQuoteRequest(BaseModel):
 class UpsellSuggestionsRequest(BaseModel):
     customer_id: Optional[UUID] = None
     lines: List[QuoteLineInput]
+
+
+class SimulateRequest(BaseModel):
+    current_deal: dict
+    changes: dict
+    lines: list
+    customer_tier: str
+
+
+class FindBetterDealRequest(BaseModel):
+    deal_context: str
+    policies: str
+
+
+@router.post("/simulate")
+async def simulate_quote(payload: SimulateRequest):
+    return simulate_deal_change(payload.current_deal, payload.changes, payload.lines, payload.customer_tier)
+
+
+@router.post("/find-better-deal")
+async def ai_find_better_deal(payload: FindBetterDealRequest):
+    try:
+        alternatives = await find_better_deal(payload.deal_context, payload.policies)
+        return {"alternatives": alternatives}
+    except Exception as e:
+        # Fallback pareto options if LLM fails
+        return {"alternatives": [
+            {"label": "Pareto Option 1: Reduce Discount", "changes": {"discount_percent": 5}, "margin_impact": "+5%", "approval_level": "auto", "rationale": "Keeps discount under threshold"},
+            {"label": "Pareto Option 2: Add Service Contract", "changes": {"add_service": True}, "margin_impact": "+8%", "approval_level": "sales_manager", "rationale": "High margin service offsets hardware discount"},
+            {"label": "Pareto Option 3: Volume Commitment", "changes": {"quantity_increase": 50}, "margin_impact": "+2%", "approval_level": "finance", "rationale": "Increases overall revenue to justify the requested discount"}
+        ]}
 
 
 @router.post("/upsell-suggestions")
