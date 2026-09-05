@@ -12,8 +12,8 @@ def compute_policy_risk(lines: list, customer_tier: str) -> dict:
         if given > limit:
             over = given - limit
             violations.append({"product": line.get("name"), "given": given, "limit": limit, "over": over})
-            # Any discount violation adds policy points; scaled to reach up to 60 for significant violations
-            score += int(over * 3) + 20
+            # Any discount violation immediately escalates above auto-approval (base 41 points + 3 pts per % over)
+            score += int(over * 3) + 41
     return {"score": min(score, 60), "violations": violations}
 
 
