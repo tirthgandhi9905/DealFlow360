@@ -12,8 +12,9 @@ def compute_policy_risk(lines: list, customer_tier: str) -> dict:
         if given > limit:
             over = given - limit
             violations.append({"product": line.get("name"), "given": given, "limit": limit, "over": over})
-            score += min(int(over * 5), 40)
-    return {"score": min(score, 40), "violations": violations}
+            # Any discount violation adds policy points; scaled to reach up to 60 for significant violations
+            score += int(over * 3) + 20
+    return {"score": min(score, 60), "violations": violations}
 
 
 def compute_behavioral_risk(deal: dict) -> dict:
@@ -36,8 +37,8 @@ def compute_commercial_risk(deal: dict) -> dict:
     score = 0
     factors = []
     margin = deal.get("margin_percent", 50)
-    if margin < 15:
-        s = min(int((15 - margin) * 3), 30)
+    if margin < 25:
+        s = min(int((25 - margin) * 2), 30)
         score += s
         factors.append({"factor": "margin_erosion", "margin": margin, "points": s})
     return {"score": min(score, 30), "factors": factors}
