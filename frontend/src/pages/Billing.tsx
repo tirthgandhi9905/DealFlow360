@@ -3,7 +3,7 @@ import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
-import { CreditCard, FileText, CheckCircle2, Clock, AlertTriangle } from "lucide-react"
+import { CreditCard, FileText, CheckCircle2, Clock, AlertTriangle, Printer, Download, X } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
@@ -20,6 +20,9 @@ export default function Billing() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [page, setPage] = useState(1)
+  
+  // Invoice Modal State
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
 
   const load = async () => {
     setLoading(true)
@@ -49,6 +52,9 @@ export default function Billing() {
         method: "bank_transfer",
       })
       await load()
+      if (selectedInvoice && selectedInvoice.id === inv.id) {
+        setSelectedInvoice({ ...selectedInvoice, status: "paid" })
+      }
     } catch (e: any) {
       alert(e?.response?.data?.detail || "Failed to record payment")
     } finally {
@@ -87,7 +93,11 @@ export default function Billing() {
               {busyId === r.id ? "..." : "Mark Paid"}
             </button>
           )}
-          <button className="p-1.5 text-muted-foreground hover:bg-slate-100 hover:text-primary rounded-md transition-colors" title="View Invoice">
+          <button 
+            onClick={() => setSelectedInvoice(r)}
+            className="p-1.5 text-muted-foreground hover:bg-slate-100 hover:text-primary rounded-md transition-colors" 
+            title="View Invoice"
+          >
             <FileText className="w-4 h-4" />
           </button>
         </div>
@@ -100,7 +110,7 @@ export default function Billing() {
   const totalCollected = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0)
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
@@ -150,6 +160,134 @@ export default function Billing() {
           </>
         )}
       </div>
+
+      {/* Invoice Detail Modal */}
+      {selectedInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">Invoice {selectedInvoice.invoice_number}</h2>
+                  <p className="text-sm text-muted-foreground">Generated from Deal {selectedInvoice.deal_number}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {getStatusBadge(selectedInvoice.status)}
+                <button onClick={() => setSelectedInvoice(null)} className="p-2 text-muted-foreground hover:bg-slate-200 rounded-full transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Billed To</h3>
+                  <p className="text-lg font-medium text-foreground">{selectedInvoice.customer_name}</p>
+                  <p className="text-sm text-slate-500 mt-1">Acme Corp Ltd.<br />123 Business Avenue<br />Tech Park, Mumbai</p>
+                </div>
+                <div className="text-right">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Invoice Details</h3>
+                  <table className="text-sm ml-auto">
+                    <tbody>
+                      <tr>
+                        <td className="py-1 pr-4 text-slate-500">Invoice Date:</td>
+                        <td className="py-1 font-medium">{new Date().toLocaleDateString()}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 pr-4 text-slate-500">Due Date:</td>
+                        <td className="py-1 font-medium text-red-600">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : "Upon Receipt"}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 pr-4 text-slate-500">Total Amount:</td>
+                        <td className="py-1 font-bold text-lg">{inr(selectedInvoice.amount)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Line Items Mock */}
+              <div className="mb-8">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-y border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left font-semibold text-slate-600">Description</th>
+                      <th className="py-3 px-4 text-right font-semibold text-slate-600">Qty</th>
+                      <th className="py-3 px-4 text-right font-semibold text-slate-600">Unit Price</th>
+                      <th className="py-3 px-4 text-right font-semibold text-slate-600">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="py-4 px-4">
+                        <p className="font-medium">Enterprise License (Annual)</p>
+                        <p className="text-xs text-muted-foreground mt-1">SKU: ENT-LIC-001</p>
+                      </td>
+                      <td className="py-4 px-4 text-right">1</td>
+                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount * 0.8)}</td>
+                      <td className="py-4 px-4 text-right font-medium">{inr(selectedInvoice.amount * 0.8)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-4 px-4">
+                        <p className="font-medium">Implementation Services</p>
+                        <p className="text-xs text-muted-foreground mt-1">One-time setup fee</p>
+                      </td>
+                      <td className="py-4 px-4 text-right">1</td>
+                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount * 0.2)}</td>
+                      <td className="py-4 px-4 text-right font-medium">{inr(selectedInvoice.amount * 0.2)}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot className="border-t-2 border-border">
+                    <tr>
+                      <td colSpan={3} className="py-4 px-4 text-right font-semibold">Subtotal:</td>
+                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} className="py-2 px-4 text-right text-slate-500">Tax (18% GST):</td>
+                      <td className="py-2 px-4 text-right text-slate-500">{inr(selectedInvoice.amount * 0.18)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} className="py-4 px-4 text-right font-bold text-lg">Total:</td>
+                      <td className="py-4 px-4 text-right font-bold text-lg text-primary">{inr(selectedInvoice.amount * 1.18)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="px-6 py-4 border-t border-border bg-slate-50 flex items-center justify-between">
+              <div className="flex gap-2">
+                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                  <Printer className="w-4 h-4 text-slate-500" /> Print
+                </button>
+                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                  <Download className="w-4 h-4 text-slate-500" /> PDF
+                </button>
+              </div>
+              
+              <div className="flex gap-2">
+                {selectedInvoice.status !== "paid" && (
+                  <button 
+                    onClick={() => markPaid(selectedInvoice)}
+                    disabled={busyId === selectedInvoice.id}
+                    className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    {busyId === selectedInvoice.id ? "Processing..." : "Record Payment"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

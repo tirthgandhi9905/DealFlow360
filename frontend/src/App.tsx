@@ -15,6 +15,7 @@ import Products from "@/pages/Products"
 import Customers from "@/pages/Customers"
 import CustomerDetail from "@/pages/CustomerDetail"
 import CustomerPortal from "@/pages/CustomerPortal"
+import Settings from "@/pages/Settings"
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/products" element={<Products />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/customers/:id" element={<CustomerDetail />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </AppShell>

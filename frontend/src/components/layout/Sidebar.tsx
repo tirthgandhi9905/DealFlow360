@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom"
 import { cn } from "@/lib/utils"
+import { DealFlowLogo } from "./DealFlowLogo"
 import { 
   LayoutDashboard, 
   FileText, 
@@ -9,7 +10,8 @@ import {
   CreditCard, 
   HeartPulse, 
   Box, 
-  Users 
+  Users,
+  Settings 
 } from "lucide-react"
 
 const nav = [
@@ -22,21 +24,14 @@ const nav = [
   { label: "Deal Health", path: "/deal-health", icon: HeartPulse },
   { label: "Products", path: "/products", icon: Box },
   { label: "Customers", path: "/customers", icon: Users },
+  { label: "Settings", path: "/settings", icon: Settings },
 ]
 
 export default function Sidebar() {
   return (
     <aside className="w-64 border-r border-border bg-surface h-screen sticky top-0 flex flex-col">
       <div className="p-6 border-b border-border/50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <span className="text-white font-bold text-lg leading-none">D</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground leading-tight">DealFlow360</h1>
-            <p className="text-xs text-muted-foreground">B2B Sales Platform</p>
-          </div>
-        </div>
+        <DealFlowLogo size={32} />
       </div>
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {nav.map((item) => (

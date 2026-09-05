@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import api from "@/lib/api"
+import { useAuth } from "@/hooks/useAuth"
 import { Check, X, AlertTriangle, ArrowLeft, Send } from "lucide-react"
 
 function inr(n: number): string {
@@ -10,6 +11,7 @@ function inr(n: number): string {
 export default function ApprovalDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [detail, setDetail] = useState<any>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState("")
@@ -47,6 +49,30 @@ export default function ApprovalDetail() {
   const riskColor =
     detail.risk_score > 70 ? "bg-destructive" :
     detail.risk_score > 40 ? "bg-warning" : "bg-success"
+
+  // Role Checks
+  const isSalesRep = user?.role === "SALES_REP"
+  const isManager = user?.role === "SALES_MANAGER"
+  const isFinance = user?.role === "FINANCE"
+  const isAdmin = user?.role === "ADMIN"
+  
+  const requiresFinance = detail.required_level === "finance"
+  
+  const canApprove = !isSalesRep && (
+    (requiresFinance && (isFinance || isAdmin || isManager)) || 
+    (!requiresFinance && (isManager || isFinance || isAdmin))
+  )
+
+  const isEndorsementOnly = requiresFinance && isManager
+  
+  const getAuthorityWarning = () => {
+    if (isSalesRep) return "Sales Representatives cannot authorize deals."
+    if (requiresFinance && isManager) return "As a Sales Manager, you can endorse this deal, but it requires Finance Director sign-off."
+    if (requiresFinance && !isFinance && !isAdmin) return "This deal requires Finance Director approval."
+    return null
+  }
+
+  const warningMsg = getAuthorityWarning()
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500">
@@ -146,29 +172,41 @@ export default function ApprovalDetail() {
               </div>
             ) : (
               <div className="space-y-3">
+                {warningMsg && (
+                  <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium flex gap-2 items-start">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p>{warningMsg}</p>
+                  </div>
+                )}
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Optional note..."
                   rows={2}
                   className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                  disabled={!canApprove && isSalesRep}
                 />
                 <button
-                  disabled={!!busy}
+                  disabled={!!busy || (!canApprove && isSalesRep)}
                   onClick={() => takeAction("approved")}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-success hover:bg-success/90 text-white font-medium transition-all disabled:opacity-50"
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-white font-medium transition-all disabled:opacity-50 ${isEndorsementOnly ? "bg-blue-600 hover:bg-blue-700" : "bg-success hover:bg-success/90"}`}
                 >
-                  <Check className="w-4 h-4" /> {busy === "approved" ? "Approving..." : "Approve Deal"}
+                  <Check className="w-4 h-4" /> 
+                  {busy === "approved" 
+                    ? "Processing..." 
+                    : isEndorsementOnly 
+                      ? "Endorse Deal" 
+                      : "Approve Deal"}
                 </button>
                 <button
-                  disabled={!!busy}
+                  disabled={!!busy || isSalesRep}
                   onClick={() => takeAction("returned")}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-warning hover:bg-warning/90 text-white font-medium transition-all disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" /> {busy === "returned" ? "Returning..." : "Return to Rep"}
                 </button>
                 <button
-                  disabled={!!busy}
+                  disabled={!!busy || isSalesRep}
                   onClick={() => takeAction("rejected")}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-destructive text-destructive hover:bg-destructive/10 font-medium transition-colors disabled:opacity-50"
                 >

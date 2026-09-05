@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
+import { DealFlowLogo } from "@/components/layout/DealFlowLogo"
 
 export default function Login() {
   const { login } = useAuth()
@@ -41,12 +42,9 @@ export default function Login() {
       <div className="absolute bottom-0 right-0 w-[600px] h-[400px] bg-secondary/5 blur-[100px] rounded-full -z-10" />
 
       <div className="w-full max-w-md p-8 glass rounded-2xl animate-in fade-in zoom-in duration-500">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 mx-auto mb-4">
-            <span className="text-white font-bold text-2xl leading-none">D</span>
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">DealFlow360</h1>
-          <p className="text-sm text-muted-foreground">Sign in to your sales workspace</p>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <DealFlowLogo size={48} className="mb-2" />
+          <p className="text-sm text-muted-foreground mt-2">Sign in to your sales workspace</p>
         </div>
 
         {error && (

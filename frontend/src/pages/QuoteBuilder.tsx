@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
 import api from "@/lib/api"
-import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X, Pencil, Lock } from "lucide-react"
+import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X, Pencil, Lock, Zap } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
@@ -37,10 +37,6 @@ export default function QuoteBuilder() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Three modes: new / view / edit
-  // - /quotes/new           → id undefined or "new"           → create new
-  // - /quotes/:id           → id + no /edit suffix            → read-only view
-  // - /quotes/:id/edit      → id + /edit                      → edit existing
   const isNew = !id || id === "new"
   const isEdit = !isNew && location.pathname.endsWith("/edit")
   const isView = !isNew && !isEdit
@@ -58,7 +54,11 @@ export default function QuoteBuilder() {
   const [upsell, setUpsell] = useState<any>({ current_cart: {}, suggestions: [] })
   const [showAddPicker, setShowAddPicker] = useState(false)
 
-  // Loaded quote metadata (for view/edit modes)
+  // Digital Twin state
+  const [showTwinModal, setShowTwinModal] = useState(false)
+  const [twinLoading, setTwinLoading] = useState(false)
+  const [twinAlternatives, setTwinAlternatives] = useState<any[]>([])
+
   const [quoteMeta, setQuoteMeta] = useState<any>(null)
 
   useEffect(() => {
@@ -92,7 +92,6 @@ export default function QuoteBuilder() {
             .filter((x: Line | null): x is Line => x !== null)
           setLines(restoredLines)
 
-          // If they hit /edit but the quote isn't editable, kick back to view
           if (isEdit && !data.editable) {
             setError(`This quote is no longer editable (deal is ${data.deal_status}). Redirecting to view mode…`)
             setTimeout(() => navigate(`/quotes/${id}`, { replace: true }), 2500)
@@ -112,7 +111,6 @@ export default function QuoteBuilder() {
     boot()
   }, [id, isNew, isEdit])
 
-  // Live upsell whenever lines change (only in editable mode)
   useEffect(() => {
     if (!canEdit || lines.length === 0) {
       setUpsell({ current_cart: {}, suggestions: [] })
@@ -132,7 +130,7 @@ export default function QuoteBuilder() {
         const r = await api.post("/quotes/upsell-suggestions", payload)
         setUpsell(r.data)
       } catch {
-        /* silently ignore transient errors */
+        /* silently ignore */
       }
     }, 350)
     return () => clearTimeout(timeout)
@@ -160,6 +158,41 @@ export default function QuoteBuilder() {
     return { subtotal, discount, net, margin }
   }, [lines])
 
+  const loadTwinAlternatives = async () => {
+    if (!selectedCustomer) return alert("Select a customer first.")
+    setShowTwinModal(true)
+    setTwinLoading(true)
+    try {
+      const cust = customers.find(c => c.id === selectedCustomer)
+      const context = JSON.stringify({
+        customer: cust?.name,
+        tier: cust?.tier,
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        margin: totals.margin,
+        lines: lines.map(l => ({ name: l.product.name, qty: l.quantity, disc: l.discount_percent }))
+      })
+      const policies = "Strict finance rules: limit overall discount to 15% for non-enterprise. Favor software/services to boost margin."
+      
+      const r = await api.post("/quotes/find-better-deal", { deal_context: context, policies })
+      setTwinAlternatives(r.data.alternatives || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setTwinLoading(false)
+    }
+  }
+
+  const applyTwinAlternative = (alt: any) => {
+    if (alt.changes.discount_percent !== undefined) {
+      setLines(lines.map(l => ({ ...l, discount_percent: alt.changes.discount_percent })))
+    }
+    if (alt.changes.quantity_increase) {
+      setLines(lines.map(l => ({ ...l, quantity: l.quantity + Math.floor(l.quantity * 0.2) })))
+    }
+    setShowTwinModal(false)
+  }
+
   const submitQuote = async () => {
     if (!selectedCustomer) return alert("Pick a customer first.")
     if (lines.length === 0) return alert("Add at least one line item.")
@@ -177,15 +210,9 @@ export default function QuoteBuilder() {
       }
 
       if (isEdit && id) {
-        // PATCH the existing quote (in-place edit — no new version)
-        const editPayload = {
-          lines: payload.lines,
-          notes: undefined,
-        }
-        const r = await api.patch(`/quotes/${id}`, editPayload)
+        const r = await api.patch(`/quotes/${id}`, { lines: payload.lines })
         setSavedResult(r.data)
       } else {
-        // Create new quote + deal
         const r = await api.post("/quotes/", payload)
         setSavedResult(r.data)
       }
@@ -212,7 +239,7 @@ export default function QuoteBuilder() {
       : `Read-only view · Deal ${quoteMeta?.deal_number || ""} · Status: ${quoteMeta?.deal_status || "?"}`
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] -m-6 animate-in fade-in">
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-6 animate-in fade-in relative">
       {/* Header */}
       <div className="bg-surface border-b border-border p-6 flex justify-between items-center shrink-0 flex-wrap gap-3">
         <div>
@@ -238,7 +265,7 @@ export default function QuoteBuilder() {
               <select
                 value={selectedCustomer}
                 onChange={(e) => setSelectedCustomer(e.target.value)}
-                disabled={isEdit /* customer is locked once a deal exists */}
+                disabled={isEdit}
                 className="px-3 py-2 rounded-lg border border-border bg-white text-sm min-w-[220px] disabled:bg-slate-100 disabled:cursor-not-allowed"
               >
                 <option value="">Select customer…</option>
@@ -248,6 +275,12 @@ export default function QuoteBuilder() {
                   </option>
                 ))}
               </select>
+              <button
+                onClick={loadTwinAlternatives}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium transition-colors"
+              >
+                <Zap className="w-4 h-4" /> Deal Twin
+              </button>
               <button
                 onClick={submitQuote}
                 disabled={submitting || lines.length === 0}
@@ -490,7 +523,7 @@ export default function QuoteBuilder() {
                             {s.margin_delta_if_added > 0 ? "+" : ""}{s.margin_delta_if_added}% margin
                           </span>
                           {prod && (
-                            <button
+                           <button
                               onClick={() => addProduct(prod)}
                               className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors"
                             >
@@ -507,6 +540,65 @@ export default function QuoteBuilder() {
           )}
         </div>
       </div>
+
+      {/* Deal Digital Twin Modal */}
+      {showTwinModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">Deal Digital Twin</h3>
+                  <p className="text-sm text-muted-foreground">AI-powered deal structure optimization</p>
+                </div>
+              </div>
+              <button onClick={() => setShowTwinModal(false)} className="p-2 text-muted-foreground hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 bg-white min-h-[300px]">
+              {twinLoading ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground animate-pulse">
+                  <Sparkles className="w-8 h-8 mb-4 text-blue-400" />
+                  <p>Running multi-variable deal simulations...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-foreground font-medium mb-2">Simulated alternative structures for better margins & faster approval:</p>
+                  {twinAlternatives.map((alt, i) => (
+                    <div key={i} className="border border-border rounded-xl p-4 hover:border-blue-300 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-blue-700">{alt.label}</h4>
+                        <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full font-medium">Impact: {alt.margin_impact}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">{alt.rationale}</p>
+                      <div className="flex justify-between items-center mt-4">
+                        <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          Expected Routing: <span className="capitalize">{String(alt.approval_level).replace('_', ' ')}</span>
+                        </div>
+                        <button 
+                          onClick={() => applyTwinAlternative(alt)}
+                          className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium shadow-sm"
+                        >
+                          Apply to Quote
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {twinAlternatives.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-8">No better alternatives found. Your deal structure is optimal!</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
