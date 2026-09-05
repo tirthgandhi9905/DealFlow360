@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import api from "@/lib/api"
-import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X } from "lucide-react"
+import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X, Pencil, Lock } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
@@ -35,7 +35,16 @@ interface Line {
 export default function QuoteBuilder() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Three modes: new / view / edit
+  // - /quotes/new           → id undefined or "new"           → create new
+  // - /quotes/:id           → id + no /edit suffix            → read-only view
+  // - /quotes/:id/edit      → id + /edit                      → edit existing
   const isNew = !id || id === "new"
+  const isEdit = !isNew && location.pathname.endsWith("/edit")
+  const isView = !isNew && !isEdit
+  const canEdit = isNew || isEdit
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -49,7 +58,9 @@ export default function QuoteBuilder() {
   const [upsell, setUpsell] = useState<any>({ current_cart: {}, suggestions: [] })
   const [showAddPicker, setShowAddPicker] = useState(false)
 
-  // Initial load: products + customers, and if viewing existing quote, load it too
+  // Loaded quote metadata (for view/edit modes)
+  const [quoteMeta, setQuoteMeta] = useState<any>(null)
+
   useEffect(() => {
     const boot = async () => {
       try {
@@ -65,7 +76,8 @@ export default function QuoteBuilder() {
         if (!isNew && id) {
           const q = await api.get(`/quotes/${id}`)
           const data = q.data
-          setSelectedCustomer("")
+          setQuoteMeta(data)
+          setSelectedCustomer(data.customer_id || "")
           const restoredLines: Line[] = (data.lines || [])
             .map((l: any): Line | null => {
               const prod = prodItems.find((p) => p.id === l.product_id)
@@ -79,6 +91,12 @@ export default function QuoteBuilder() {
             })
             .filter((x: Line | null): x is Line => x !== null)
           setLines(restoredLines)
+
+          // If they hit /edit but the quote isn't editable, kick back to view
+          if (isEdit && !data.editable) {
+            setError(`This quote is no longer editable (deal is ${data.deal_status}). Redirecting to view mode…`)
+            setTimeout(() => navigate(`/quotes/${id}`, { replace: true }), 2500)
+          }
         } else {
           if (custItems[0]) setSelectedCustomer(custItems[0].id)
           if (prodItems[0]) {
@@ -92,11 +110,11 @@ export default function QuoteBuilder() {
       }
     }
     boot()
-  }, [id, isNew])
+  }, [id, isNew, isEdit])
 
-  // Live upsell whenever lines change
+  // Live upsell whenever lines change (only in editable mode)
   useEffect(() => {
-    if (lines.length === 0) {
+    if (!canEdit || lines.length === 0) {
       setUpsell({ current_cart: {}, suggestions: [] })
       return
     }
@@ -114,11 +132,11 @@ export default function QuoteBuilder() {
         const r = await api.post("/quotes/upsell-suggestions", payload)
         setUpsell(r.data)
       } catch {
-        /* silently keep last upsell */
+        /* silently ignore transient errors */
       }
     }, 350)
     return () => clearTimeout(timeout)
-  }, [lines, selectedCustomer])
+  }, [lines, selectedCustomer, canEdit])
 
   const updateLine = (index: number, field: keyof Line, value: any) => {
     const next = [...lines]
@@ -157,10 +175,23 @@ export default function QuoteBuilder() {
           discount_percent: l.discount_percent,
         })),
       }
-      const r = await api.post("/quotes/", payload)
-      setSavedResult(r.data)
+
+      if (isEdit && id) {
+        // PATCH the existing quote (in-place edit — no new version)
+        const editPayload = {
+          lines: payload.lines,
+          notes: undefined,
+        }
+        const r = await api.patch(`/quotes/${id}`, editPayload)
+        setSavedResult(r.data)
+      } else {
+        // Create new quote + deal
+        const r = await api.post("/quotes/", payload)
+        setSavedResult(r.data)
+      }
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Failed to create quote")
+      const detail = e?.response?.data?.detail
+      setError(typeof detail === "string" ? detail : "Failed to submit")
     } finally {
       setSubmitting(false)
     }
@@ -168,23 +199,47 @@ export default function QuoteBuilder() {
 
   if (loading) return <div className="p-8 text-center animate-pulse">Loading quote builder...</div>
 
+  const headerTitle = isNew
+    ? "New Quotation"
+    : isEdit
+      ? `Editing ${quoteMeta?.quote_number || ""}`
+      : `Quotation ${quoteMeta?.quote_number || id?.slice(0, 8)}`
+
+  const headerSubtitle = isNew
+    ? "Real-time risk routing + AI upsell"
+    : isEdit
+      ? `In-place edit — approval will be re-triggered. Deal status: ${quoteMeta?.deal_status || "?"}`
+      : `Read-only view · Deal ${quoteMeta?.deal_number || ""} · Status: ${quoteMeta?.deal_status || "?"}`
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-6 animate-in fade-in">
       {/* Header */}
-      <div className="bg-surface border-b border-border p-6 flex justify-between items-center shrink-0">
+      <div className="bg-surface border-b border-border p-6 flex justify-between items-center shrink-0 flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-foreground">{isNew ? "New Quotation" : `Quotation ${id?.slice(0, 8)}`}</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isNew ? "Real-time risk routing + AI upsell" : "Read-only view"}
-          </p>
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            {isEdit && <Pencil className="w-5 h-5 text-primary" />}
+            {isView && !quoteMeta?.editable && <Lock className="w-5 h-5 text-muted-foreground" />}
+            {headerTitle}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">{headerSubtitle}</p>
+          {(quoteMeta?.edit_count ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground mt-1 italic">
+              Last edited by <span className="font-medium text-foreground">{quoteMeta.last_edited_by_name || "unknown"}</span>
+              {quoteMeta.last_edited_at && (
+                <> on <span className="font-medium text-foreground">{new Date(quoteMeta.last_edited_at).toLocaleString()}</span></>
+              )}
+              {" · "}<span>{quoteMeta.edit_count} edit(s)</span>
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          {isNew && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {canEdit && (
             <>
               <select
                 value={selectedCustomer}
                 onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-border bg-white text-sm min-w-[220px]"
+                disabled={isEdit /* customer is locked once a deal exists */}
+                className="px-3 py-2 rounded-lg border border-border bg-white text-sm min-w-[220px] disabled:bg-slate-100 disabled:cursor-not-allowed"
               >
                 <option value="">Select customer…</option>
                 {customers.map((c) => (
@@ -198,9 +253,20 @@ export default function QuoteBuilder() {
                 disabled={submitting || lines.length === 0}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
               >
-                <Send className="w-4 h-4" /> {submitting ? "Submitting…" : "Create Quote & Deal"}
+                <Send className="w-4 h-4" />
+                {submitting
+                  ? (isEdit ? "Saving…" : "Submitting…")
+                  : (isEdit ? "Save Changes" : "Create Quote & Deal")}
               </button>
             </>
+          )}
+          {isView && quoteMeta?.editable && (
+            <button
+              onClick={() => navigate(`/quotes/${id}/edit`)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-primary text-primary text-sm font-medium hover:bg-primary/5 transition-all"
+            >
+              <Pencil className="w-4 h-4" /> Edit this Quote
+            </button>
           )}
         </div>
       </div>
@@ -213,18 +279,31 @@ export default function QuoteBuilder() {
 
       {savedResult && (
         <div className="m-4 p-4 rounded-lg bg-success/10 border border-success/30 text-success text-sm">
-          <p className="font-semibold mb-1">✓ Quote {savedResult.quote?.quote_number} created for {savedResult.deal?.deal_number}</p>
+          <p className="font-semibold mb-1">
+            ✓ {isEdit ? "Quote updated" : "Quote created"}: {savedResult.quote?.quote_number} for {savedResult.deal?.deal_number}
+          </p>
           <p className="text-xs">
             Status: <span className="font-medium capitalize">{String(savedResult.deal?.status).replace(/_/g, " ")}</span>
             {" · "}Risk: {savedResult.deal?.risk_score}/100
             {" · "}{savedResult.auto_approved ? "Auto-approved" : `Routed to: ${savedResult.deal?.required_approval_level}`}
+            {isEdit && savedResult.quote?.edit_count && (
+              <> · Edit count: {savedResult.quote.edit_count}</>
+            )}
           </p>
-          <button
-            onClick={() => navigate("/quotes")}
-            className="mt-2 text-xs underline"
-          >
-            → Go to Quotes list
-          </button>
+          <div className="mt-3 flex gap-3 text-xs flex-wrap">
+            <button onClick={() => navigate("/quotes")} className="underline">→ Go to Quotes list</button>
+            <button
+              onClick={() => window.open(`/portal/${savedResult.quote?.id}`, "_blank", "noopener")}
+              className="underline"
+            >
+              → Open Customer Portal (new tab)
+            </button>
+            {savedResult.approval_id && (
+              <button onClick={() => navigate(`/approvals/${savedResult.approval_id}`)} className="underline">
+                → Go to Approval
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -258,7 +337,7 @@ export default function QuoteBuilder() {
                         <input
                           type="number" min="1"
                           value={line.quantity}
-                          disabled={!isNew}
+                          disabled={!canEdit}
                           onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
                           className="w-full bg-background border border-border rounded px-2 py-1 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
                         />
@@ -267,7 +346,7 @@ export default function QuoteBuilder() {
                         <input
                           type="number" min="0" step="0.01"
                           value={line.unit_price}
-                          disabled={!isNew}
+                          disabled={!canEdit}
                           onChange={(e) => updateLine(idx, "unit_price", parseFloat(e.target.value) || 0)}
                           className="w-full bg-background border border-border rounded px-2 py-1 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
                         />
@@ -277,7 +356,7 @@ export default function QuoteBuilder() {
                           <input
                             type="number" min="0" max="100"
                             value={line.discount_percent}
-                            disabled={!isNew}
+                            disabled={!canEdit}
                             onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
                             className="w-full bg-background border border-border rounded px-2 py-1 pr-7 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
                           />
@@ -286,7 +365,7 @@ export default function QuoteBuilder() {
                       </td>
                       <td className="px-4 py-4 font-medium">{inr(finalPrice)}</td>
                       <td className="px-4 py-4">
-                        {isNew && (
+                        {canEdit && (
                           <button onClick={() => removeLine(idx)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                             <X className="w-4 h-4" />
                           </button>
@@ -298,7 +377,7 @@ export default function QuoteBuilder() {
               </tbody>
             </table>
 
-            {isNew && (
+            {canEdit && (
               <div className="p-4 border-t border-border bg-slate-50 relative">
                 <button
                   onClick={() => setShowAddPicker(!showAddPicker)}
@@ -385,45 +464,47 @@ export default function QuoteBuilder() {
             )}
           </div>
 
-          <div className="p-6 bg-gradient-to-b from-primary/5 to-transparent flex-1">
-            <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4 text-primary" /> AI Upsell Suggestions
-            </h3>
-            {upsell.suggestions?.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Add items to see suggestions.</p>
-            ) : (
-              <div className="space-y-3">
-                {upsell.suggestions.slice(0, 4).map((s: any) => {
-                  const prod = products.find((p) => p.id === s.product_id)
-                  return (
-                    <div key={s.product_id} className="p-3 rounded-lg border border-primary/20 bg-surface shadow-sm hover:border-primary/50 transition-colors">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-medium text-sm">{s.name}</span>
-                        <span className="text-sm font-semibold">{inr(s.base_price)}</span>
-                      </div>
-                      {s.promotion_tag && (
-                        <div className="text-[10px] uppercase font-medium text-primary mb-1">{s.promotion_tag}</div>
-                      )}
-                      <div className="flex justify-between items-center mt-2">
-                        <span className={`text-xs flex items-center gap-1 ${s.margin_delta_if_added > 0 ? "text-success" : "text-muted-foreground"}`}>
-                          <TrendingUp className="w-3 h-3" />
-                          {s.margin_delta_if_added > 0 ? "+" : ""}{s.margin_delta_if_added}% margin
-                        </span>
-                        {prod && isNew && (
-                          <button
-                            onClick={() => addProduct(prod)}
-                            className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors"
-                          >
-                            Add
-                          </button>
+          {canEdit && (
+            <div className="p-6 bg-gradient-to-b from-primary/5 to-transparent flex-1">
+              <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
+                <Sparkles className="w-4 h-4 text-primary" /> AI Upsell Suggestions
+              </h3>
+              {upsell.suggestions?.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Add items to see suggestions.</p>
+              ) : (
+                <div className="space-y-3">
+                  {upsell.suggestions.slice(0, 4).map((s: any) => {
+                    const prod = products.find((p) => p.id === s.product_id)
+                    return (
+                      <div key={s.product_id} className="p-3 rounded-lg border border-primary/20 bg-surface shadow-sm hover:border-primary/50 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-medium text-sm">{s.name}</span>
+                          <span className="text-sm font-semibold">{inr(s.base_price)}</span>
+                        </div>
+                        {s.promotion_tag && (
+                          <div className="text-[10px] uppercase font-medium text-primary mb-1">{s.promotion_tag}</div>
                         )}
+                        <div className="flex justify-between items-center mt-2">
+                          <span className={`text-xs flex items-center gap-1 ${s.margin_delta_if_added > 0 ? "text-success" : "text-muted-foreground"}`}>
+                            <TrendingUp className="w-3 h-3" />
+                            {s.margin_delta_if_added > 0 ? "+" : ""}{s.margin_delta_if_added}% margin
+                          </span>
+                          {prod && (
+                            <button
+                              onClick={() => addProduct(prod)}
+                              className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors"
+                            >
+                              Add
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

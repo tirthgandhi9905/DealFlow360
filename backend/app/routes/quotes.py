@@ -10,7 +10,7 @@ from app.models.quote import Quote, QuoteLine
 from app.models.deal import Deal, DealStatus
 from app.models.customer import Customer, CustomerTier
 from app.models.product import Product, ProductCategory
-from app.models.approval import Approval, ApprovalStatus
+from app.models.approval import Approval, ApprovalStatus, ApprovalStep
 from app.models.audit import AuditEvent
 from app.auth.dependencies import get_current_user
 from app.models.user import User
@@ -446,12 +446,23 @@ async def get_quote_detail(
             "discount_exceeded": line.discount_percent > line.discount_limit,
         })
 
+    # Fetch last editor name if edited
+    last_editor_name = None
+    if quote.last_edited_by:
+        user_res = await db.execute(select(User.name).where(User.id == quote.last_edited_by))
+        last_editor_name = user_res.scalar_one_or_none()
+
+    # A quote is editable while its deal has not been approved / confirmed / fulfilled / cancelled
+    deal_status_val = deal.status.value if deal and hasattr(deal.status, "value") else str(deal.status) if deal else None
+    editable = deal_status_val in ("draft", "pending_approval")
+
     return {
         "id": str(quote.id),
         "quote_number": quote.quote_number,
         "deal_id": str(quote.deal_id),
         "deal_number": deal.deal_number if deal else None,
-        "deal_status": deal.status.value if deal and hasattr(deal.status, "value") else str(deal.status) if deal else None,
+        "deal_status": deal_status_val,
+        "customer_id": str(deal.customer_id) if deal else None,
         "customer_name": customer_name,
         "customer_tier": customer_tier.value if customer_tier and hasattr(customer_tier, "value") else str(customer_tier) if customer_tier else None,
         "version": quote.version,
@@ -460,6 +471,10 @@ async def get_quote_detail(
         "tax_amount": quote.tax_amount,
         "grand_total": quote.grand_total,
         "created_at": quote.created_at.isoformat() if quote.created_at else None,
+        "editable": editable,
+        "edit_count": quote.edit_count or 0,
+        "last_edited_by_name": last_editor_name,
+        "last_edited_at": quote.last_edited_at.isoformat() if quote.last_edited_at else None,
         "lines": line_items,
     }
 
@@ -484,4 +499,232 @@ async def get_quotes_by_deal(
             }
             for q in quotes
         ]
+    }
+
+class EditQuoteRequest(BaseModel):
+    """
+    Payload for PATCH /quotes/{quote_id}. Updates the quote in-place instead of
+    creating a new version. Only valid while the parent deal is still in
+    'draft' or 'pending_approval' status.
+    """
+    lines: List[QuoteLineInput]
+    notes: Optional[str] = None
+
+
+@router.patch("/{quote_id}")
+async def edit_quote(
+    quote_id: UUID,
+    payload: EditQuoteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Edit an in-flight quote before it's been approved.
+
+    Behavior:
+    - Reads the existing quote and its parent deal.
+    - Rejects the edit if the deal is already approved / confirmed / fulfilled / cancelled.
+    - Deletes the old QuoteLine rows and inserts fresh ones from the payload
+      (no new Quote version is created — this is a true in-place edit).
+    - Recomputes totals, margin, risk, and approval routing.
+    - Any pre-existing pending Approval is reset (steps cleared, note added) so
+      approvers must re-verify from scratch — this matches the "re-verification"
+      requirement.
+    - Populates quote.last_edited_by, quote.last_edited_at, quote.edit_count.
+    - Writes an AuditEvent capturing user, timestamp, and diff summary.
+    """
+    if not payload.lines:
+        raise HTTPException(status_code=400, detail="Quote must contain at least one line item")
+
+    quote_res = await db.execute(select(Quote).where(Quote.id == quote_id))
+    quote = quote_res.scalar_one_or_none()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+
+    deal_res = await db.execute(select(Deal).where(Deal.id == quote.deal_id))
+    deal = deal_res.scalar_one_or_none()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Parent deal not found")
+
+    deal_status_val = deal.status.value if hasattr(deal.status, "value") else str(deal.status).lower()
+    if deal_status_val not in ("draft", "pending_approval"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quote can only be edited while the deal is in draft or pending_approval status (current: {deal_status_val}).",
+        )
+
+    # Get customer + product data for recompute
+    cust_res = await db.execute(select(Customer).where(Customer.id == deal.customer_id))
+    customer = cust_res.scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found for this deal")
+
+    customer_tier_str = customer.tier.value if hasattr(customer.tier, "value") else str(customer.tier).lower()
+
+    product_ids = [line.product_id for line in payload.lines]
+    prods_res = await db.execute(select(Product).where(Product.id.in_(product_ids)))
+    products_by_id = {p.id: p for p in prods_res.scalars().all()}
+    missing = set(product_ids) - set(products_by_id.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Products not found: {list(missing)}")
+
+    # Recompute totals
+    subtotal = 0.0
+    total_discount = 0.0
+    total_amount = 0.0
+    total_cost = 0.0
+    tax_amount = 0.0
+    processed_lines = []
+    risk_engine_lines = []
+
+    for line_in in payload.lines:
+        prod = products_by_id[line_in.product_id]
+        category_str = prod.category.value if hasattr(prod.category, "value") else str(prod.category).lower()
+        unit_price = line_in.unit_price if line_in.unit_price is not None else prod.base_price
+        base_line_price = unit_price * line_in.quantity
+        max_disc_allowed = get_max_discount(customer_tier_str, category_str)
+        disc_pct = line_in.discount_percent
+        line_discount_amount = base_line_price * (disc_pct / 100.0)
+        net_line_total = base_line_price - line_discount_amount
+        line_cost = prod.cost * line_in.quantity
+        line_tax = net_line_total * (prod.tax_percent / 100.0)
+
+        subtotal += base_line_price
+        total_discount += line_discount_amount
+        total_amount += net_line_total
+        total_cost += line_cost
+        tax_amount += line_tax
+
+        processed_lines.append({
+            "product": prod, "quantity": line_in.quantity, "unit_price": unit_price,
+            "discount_percent": disc_pct, "discount_limit": max_disc_allowed,
+            "line_total": round(net_line_total, 2), "line_cost": round(line_cost, 2),
+        })
+        risk_engine_lines.append({
+            "name": prod.name, "category": category_str,
+            "discount_percent": disc_pct, "quantity": line_in.quantity,
+        })
+
+    grand_total = round(total_amount + tax_amount, 2)
+    margin_percent = round(((total_amount - total_cost) / total_amount) * 100, 2) if total_amount > 0 else 0.0
+
+    # Recompute risk & routing
+    deal_context = {
+        "idle_days": 0,
+        "negotiation_rounds": 0,
+        "margin_percent": margin_percent,
+        "total_amount": total_amount,
+    }
+    risk_result = compute_total_risk(risk_engine_lines, deal_context, customer_tier_str)
+    risk_score = risk_result["total_score"]
+    required_approval = risk_result["approval_level"]
+
+    # Capture pre-edit snapshot for audit
+    old_snapshot = {
+        "grand_total": quote.grand_total,
+        "total_discount": quote.total_discount,
+        "risk_score": deal.risk_score,
+    }
+
+    # Delete existing lines and insert fresh ones (in-place edit — same quote row, same version)
+    await db.execute(QuoteLine.__table__.delete().where(QuoteLine.quote_id == quote.id))
+    for pl in processed_lines:
+        db.add(QuoteLine(
+            id=uuid4(), quote_id=quote.id, product_id=pl["product"].id,
+            quantity=pl["quantity"], unit_price=pl["unit_price"],
+            discount_percent=pl["discount_percent"], discount_limit=pl["discount_limit"],
+            line_total=pl["line_total"],
+        ))
+
+    # Update quote header
+    quote.subtotal = round(subtotal, 2)
+    quote.total_discount = round(total_discount, 2)
+    quote.tax_amount = round(tax_amount, 2)
+    quote.grand_total = grand_total
+    quote.last_edited_by = current_user.id
+    quote.last_edited_at = datetime.utcnow()
+    quote.edit_count = (quote.edit_count or 0) + 1
+
+    # Update deal totals + status + re-route approval
+    new_deal_status = DealStatus.PENDING_APPROVAL if required_approval != "auto" else DealStatus.CONFIRMED
+    deal.total_amount = round(total_amount, 2)
+    deal.total_cost = round(total_cost, 2)
+    deal.margin_percent = margin_percent
+    deal.risk_score = risk_score
+    deal.status = new_deal_status
+    deal.updated_at = datetime.utcnow()
+    deal.last_activity_at = datetime.utcnow()
+    if payload.notes:
+        deal.notes = payload.notes
+
+    # Reset any existing pending approval: mark it superseded and create a fresh one so
+    # approvers must re-verify from scratch (matches "re-verification" requirement).
+    approval_id_out = None
+    existing_appr_res = await db.execute(
+        select(Approval).where(Approval.deal_id == deal.id, Approval.status == ApprovalStatus.PENDING)
+    )
+    for old_appr in existing_appr_res.scalars().all():
+        old_appr.status = ApprovalStatus.REJECTED  # marks it as superseded
+        old_appr.resolved_at = datetime.utcnow()
+        # Log the supersede as an approval step so it shows in the approval chain
+        db.add(ApprovalStep(
+            id=uuid4(),
+            approval_id=old_appr.id,
+            approver_id=current_user.id,
+            action=ApprovalStatus.REJECTED,
+            note=f"Superseded by quote edit from {current_user.name}",
+        ))
+
+    if required_approval != "auto":
+        new_appr = Approval(
+            id=uuid4(),
+            deal_id=deal.id,
+            status=ApprovalStatus.PENDING,
+            required_level=required_approval,
+        )
+        db.add(new_appr)
+        await db.flush()
+        approval_id_out = str(new_appr.id)
+
+    # Audit log
+    db.add(AuditEvent(
+        id=uuid4(),
+        entity_type="quote",
+        entity_id=quote.id,
+        action="quote_edited",
+        user_id=current_user.id,
+        old_value=f'{{"grand_total":{old_snapshot["grand_total"]},"risk_score":{old_snapshot["risk_score"]}}}',
+        new_value=f'{{"grand_total":{grand_total},"risk_score":{risk_score},"approval":"{required_approval}"}}',
+        reason=f"Quote {quote.quote_number} edited by {current_user.name} (edit #{quote.edit_count}); approval re-triggered → {required_approval}",
+    ))
+
+    await db.commit()
+    await db.refresh(quote)
+    await db.refresh(deal)
+
+    return {
+        "status": "success",
+        "quote": {
+            "id": str(quote.id),
+            "quote_number": quote.quote_number,
+            "version": quote.version,
+            "subtotal": quote.subtotal,
+            "total_discount": quote.total_discount,
+            "grand_total": quote.grand_total,
+            "edit_count": quote.edit_count,
+            "last_edited_by_name": current_user.name,
+            "last_edited_at": quote.last_edited_at.isoformat(),
+        },
+        "deal": {
+            "id": str(deal.id),
+            "deal_number": deal.deal_number,
+            "status": deal.status.value,
+            "total_amount": deal.total_amount,
+            "margin_percent": deal.margin_percent,
+            "risk_score": deal.risk_score,
+            "required_approval_level": required_approval,
+        },
+        "approval_id": approval_id_out,
+        "auto_approved": required_approval == "auto",
+        "message": f"Quote edited — approval re-routed to {required_approval}.",
     }

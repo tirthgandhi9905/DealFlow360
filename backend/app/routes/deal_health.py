@@ -28,6 +28,9 @@ class NudgeEscalateRequest(BaseModel):
 async def deal_health(
     stalled_days: int = Query(7, description="Threshold in days to flag a deal as stalled"),
     risk_level: Optional[str] = Query(None, description="Filter by risk level (low, medium, high)"),
+    search: Optional[str] = Query(None, description="Search by deal number or customer name"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -37,6 +40,7 @@ async def deal_health(
     - Identifies discount anomalies (risk score > 70 or negative/low margin).
     - Identifies delivery slippage and momentum loss.
     """
+    from sqlalchemy import or_
     now = datetime.utcnow()
     stalled_threshold_date = now - timedelta(days=stalled_days)
 
@@ -47,6 +51,10 @@ async def deal_health(
         .where(Deal.status.notin_([DealStatus.FULFILLED, DealStatus.CANCELLED]))
         .order_by(Deal.risk_score.desc())
     )
+    if search:
+        pat = f"%{search}%"
+        query = query.where(or_(Deal.deal_number.ilike(pat), Customer.name.ilike(pat)))
+
     result = await db.execute(query)
     rows = result.all()
 
@@ -92,16 +100,23 @@ async def deal_health(
     medium = sum(1 for i in items if i["risk_level"] == "medium")
     low = sum(1 for i in items if i["risk_level"] == "low")
 
+    # Paginate AFTER filtering; total reflects post-filter count
+    total = len(items)
+    paginated = items[skip : skip + limit]
+
     return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
         "summary": {
-            "total_active_deals": len(items),
+            "total_active_deals": total,
             "high_risk": high,
             "medium_risk": medium,
             "low_risk": low,
             "stalled_deals_count": stalled_count,
             "anomaly_deals_count": anomaly_count,
         },
-        "items": items,
+        "items": paginated,
     }
 
 

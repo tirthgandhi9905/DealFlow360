@@ -241,6 +241,7 @@ async def seed():
         deals = []
         quotes = []
         quote_lines_all = []
+        deal_lines_by_deal = {}  # deal_id -> list of (product, qty) for later fulfillment seeding
         deal_counter = 1000
 
         for i in range(500):
@@ -286,6 +287,7 @@ async def seed():
             )
             db.add(deal)
             deals.append(deal)
+            deal_lines_by_deal[deal.id] = [(ln["product"], ln["qty"]) for ln in lines]
 
             quote = Quote(
                 id=uid(), quote_number=f"QT-{deal_counter}-v1",
@@ -377,24 +379,65 @@ async def seed():
 
         # ════════════════════════════════════════
         # FULFILLMENTS — for confirmed/fulfilled deals
+        # Each fulfillment gets FulfillmentLine rows splitting each product
+        # across 1-3 warehouses (this is what the frontend "Splits" column reads).
         # ════════════════════════════════════════
         fulfill_count = 0
+        fulfill_line_count = 0
         for deal in deals:
             if deal.status not in (DealStatus.CONFIRMED, DealStatus.FULFILLED):
                 continue
-            wh = random.choice(warehouses)
-            wh2 = random.choice([w for w in warehouses if w.id != wh.id])
+
             f = Fulfillment(
                 id=uid(), deal_id=deal.id,
                 status="delivered" if deal.status == DealStatus.FULFILLED else "in_transit",
-                total_shipping_cost=round(random.uniform(500, 15000), 2),
+                total_shipping_cost=0.0,  # sum of lines, computed below
                 estimated_delivery=deal.updated_at + timedelta(days=random.randint(2, 7)),
                 delivery_confidence=round(random.uniform(0.7, 0.99), 2),
             )
             db.add(f)
+            await db.flush()  # need f.id for FulfillmentLine FKs
+
+            total_ship = 0.0
+            deal_lines = deal_lines_by_deal.get(deal.id, [])
+            for product, qty in deal_lines:
+                # Split this product across 1-3 warehouses
+                n_splits = random.choices([1, 2, 3], weights=[0.5, 0.35, 0.15])[0]
+                n_splits = min(n_splits, qty)  # can't split more than qty
+                # Distribute qty across the splits
+                if n_splits == 1:
+                    splits = [qty]
+                elif n_splits == 2:
+                    a = random.randint(1, qty - 1)
+                    splits = [a, qty - a]
+                else:
+                    a = random.randint(1, qty - 2)
+                    b = random.randint(1, qty - a - 1)
+                    splits = [a, b, qty - a - b]
+
+                chosen_warehouses = random.sample(warehouses, n_splits)
+                for wh, split_qty in zip(chosen_warehouses, splits):
+                    ship_cost = round(wh.shipping_cost_per_unit * split_qty, 2)
+                    fl = FulfillmentLine(
+                        id=uid(),
+                        fulfillment_id=f.id,
+                        warehouse_id=wh.id,
+                        product_id=product.id,
+                        quantity=split_qty,
+                        shipping_cost=ship_cost,
+                    )
+                    db.add(fl)
+                    total_ship += ship_cost
+                    fulfill_line_count += 1
+
+            f.total_shipping_cost = round(total_ship, 2)
             fulfill_count += 1
+
+            # Flush every 50 to avoid memory buildup
+            if fulfill_count % 50 == 0:
+                await db.flush()
         await db.flush()
-        print(f"[seed] {fulfill_count} fulfillments created")
+        print(f"[seed] {fulfill_count} fulfillments with {fulfill_line_count} warehouse-split lines created")
 
         # ════════════════════════════════════════
         # INVOICES + PAYMENTS — for confirmed/fulfilled deals

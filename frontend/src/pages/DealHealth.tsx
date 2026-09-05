@@ -1,32 +1,44 @@
 import { useState, useEffect } from "react"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
+import { SearchBox } from "@/components/ui/SearchBox"
+import { Pagination } from "@/components/ui/Pagination"
 import { HeartPulse, AlertTriangle, TrendingDown, Activity, Percent, Bell } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
 }
 
+const PAGE_SIZE = 15
+
 export default function DealHealth() {
   const [deals, setDeals] = useState<any[]>([])
   const [summary, setSummary] = useState<any>({})
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [riskFilter, setRiskFilter] = useState("")
+  const [page, setPage] = useState(1)
 
   const load = () => {
     setLoading(true)
+    const params: any = { stalled_days: 7, limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
+    if (search) params.search = search
+    if (riskFilter) params.risk_level = riskFilter
     api
-      .get("/deal-health/", { params: { stalled_days: 7 } })
+      .get("/deal-health/", { params })
       .then((r) => {
         setDeals(r.data.items || [])
         setSummary(r.data.summary || {})
+        setTotal(r.data.total || r.data.items?.length || 0)
       })
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load deal health"))
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [])
+  useEffect(load, [page, search, riskFilter])
 
   const nudge = async (deal: any, actionType: string) => {
     setBusyId(deal.id)
@@ -46,7 +58,6 @@ export default function DealHealth() {
 
   const exportCsv = () => {
     const token = localStorage.getItem("token") || ""
-    // We can't set headers with a plain anchor; use fetch → blob
     fetch("/api/deal-health/export?format=csv", {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -130,17 +141,29 @@ export default function DealHealth() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <HeartPulse className="w-6 h-6 text-primary" />
-            Deal Health Monitor
+            <HeartPulse className="w-6 h-6 text-primary" /> Deal Health Monitor
           </h2>
           <p className="text-sm text-muted-foreground mt-1">Stalled deals, anomalies, and risk signals</p>
         </div>
-        <button onClick={exportCsv} className="px-4 py-2 rounded-lg bg-white border border-border text-sm hover:bg-slate-50 transition-colors">
-          Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <SearchBox value={search} onChange={(v) => { setSearch(v); setPage(1) }} placeholder="Search customer or deal..." />
+          <select
+            value={riskFilter}
+            onChange={(e) => { setRiskFilter(e.target.value); setPage(1) }}
+            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
+          >
+            <option value="">All risk</option>
+            <option value="high">High risk</option>
+            <option value="medium">Medium risk</option>
+            <option value="low">Low risk</option>
+          </select>
+          <button onClick={exportCsv} className="px-4 py-2 rounded-lg bg-white border border-border text-sm hover:bg-slate-50 transition-colors">
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -151,7 +174,6 @@ export default function DealHealth() {
           </div>
           <p className="text-3xl font-bold text-destructive tracking-tight">{summary.high_risk || 0}</p>
         </div>
-
         <div className="glass p-6 rounded-xl border-l-4 border-l-warning shadow-sm">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm font-medium text-muted-foreground">Stalled Deals</p>
@@ -159,7 +181,6 @@ export default function DealHealth() {
           </div>
           <p className="text-3xl font-bold text-warning tracking-tight">{summary.stalled_deals_count || 0}</p>
         </div>
-
         <div className="glass p-6 rounded-xl border-l-4 border-l-primary shadow-sm">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm font-medium text-muted-foreground">Anomalies</p>
@@ -167,7 +188,6 @@ export default function DealHealth() {
           </div>
           <p className="text-3xl font-bold text-foreground tracking-tight">{summary.anomaly_deals_count || 0}</p>
         </div>
-
         <div className="glass p-6 rounded-xl border-l-4 border-l-success shadow-sm">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm font-medium text-muted-foreground">Total Active</p>
@@ -183,7 +203,10 @@ export default function DealHealth() {
         ) : error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
-          <DataTable data={deals} columns={columns} />
+          <>
+            <DataTable data={deals} columns={columns} />
+            <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>

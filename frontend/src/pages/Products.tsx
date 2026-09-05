@@ -1,24 +1,32 @@
 import { useState, useEffect } from "react"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
+import { SearchBox } from "@/components/ui/SearchBox"
+import { Pagination } from "@/components/ui/Pagination"
 import { Box } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
 }
 
+const PAGE_SIZE = 15
+
 export default function Products() {
   const [products, setProducts] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
+    setLoading(true)
     api
-      .get("/products/", { params: { limit: 100 } })
-      .then((r) => setProducts(r.data.items || []))
+      .get("/products/", { params: { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE, search: search || undefined } })
+      .then((r) => { setProducts(r.data.items || []); setTotal(r.data.total || 0) })
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load products"))
       .finally(() => setLoading(false))
-  }, [])
+  }, [page, search])
 
   const columns = [
     { header: "SKU", accessorKey: "sku" as const, className: "font-mono text-xs text-muted-foreground" },
@@ -33,7 +41,7 @@ export default function Products() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <Box className="w-6 h-6 text-primary" />
@@ -41,7 +49,7 @@ export default function Products() {
           </h2>
           <p className="text-sm text-muted-foreground mt-1">Live catalog with margins and subscription flags</p>
         </div>
-        <div className="text-sm text-muted-foreground">{products.length} products</div>
+        <SearchBox value={search} onChange={(v) => { setSearch(v); setPage(1) }} placeholder="Search by name or SKU..." />
       </div>
 
       <div className="glass rounded-xl p-4">
@@ -50,7 +58,10 @@ export default function Products() {
         ) : error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
-          <DataTable data={products} columns={columns} />
+          <>
+            <DataTable data={products} columns={columns} />
+            <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>

@@ -15,6 +15,10 @@ class Quote(Base):
     tax_amount = Column(Float, default=0.0)
     grand_total = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Edit-tracking: populated whenever an in-flight quote is patched via PATCH /quotes/{id}
+    last_edited_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    last_edited_at = Column(DateTime(timezone=True), nullable=True)
+    edit_count = Column(Integer, default=0)
 
 class QuoteLine(Base):
     __tablename__ = "quote_lines"

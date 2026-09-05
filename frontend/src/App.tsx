@@ -13,6 +13,7 @@ import Billing from "@/pages/Billing"
 import DealHealth from "@/pages/DealHealth"
 import Products from "@/pages/Products"
 import Customers from "@/pages/Customers"
+import CustomerDetail from "@/pages/CustomerDetail"
 import CustomerPortal from "@/pages/CustomerPortal"
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/quotes" element={<Quotes />} />
               <Route path="/quotes/new" element={<QuoteBuilder />} />
               <Route path="/quotes/:id" element={<QuoteBuilder />} />
+              <Route path="/quotes/:id/edit" element={<QuoteBuilder />} />
               <Route path="/approvals" element={<Approvals />} />
               <Route path="/approvals/:id" element={<ApprovalDetail />} />
               <Route path="/fulfillment" element={<Fulfillment />} />
@@ -39,6 +41,7 @@ export default function App() {
               <Route path="/deal-health" element={<DealHealth />} />
               <Route path="/products" element={<Products />} />
               <Route path="/customers" element={<Customers />} />
+              <Route path="/customers/:id" element={<CustomerDetail />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </AppShell>

@@ -1,23 +1,35 @@
 import { useState, useEffect } from "react"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
+import { SearchBox } from "@/components/ui/SearchBox"
+import { Pagination } from "@/components/ui/Pagination"
 import { CreditCard, FileText, CheckCircle2, Clock, AlertTriangle } from "lucide-react"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
 }
 
+const PAGE_SIZE = 15
+
 export default function Billing() {
   const [invoices, setInvoices] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [page, setPage] = useState(1)
 
   const load = async () => {
     setLoading(true)
     try {
-      const r = await api.get("/billing/invoices", { params: { limit: 100 } })
+      const params: any = { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
+      if (search) params.search = search
+      if (statusFilter) params.status = statusFilter
+      const r = await api.get("/billing/invoices", { params })
       setInvoices(r.data.items || [])
+      setTotal(r.data.total || 0)
       setError("")
     } catch (e: any) {
       setError(e?.response?.data?.detail || "Failed to load invoices")
@@ -26,9 +38,7 @@ export default function Billing() {
     }
   }
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [page, search, statusFilter])
 
   const markPaid = async (inv: any) => {
     if (inv.status === "paid") return
@@ -85,33 +95,46 @@ export default function Billing() {
     },
   ]
 
+  // Summary — computed on the current page. For the whole DB, we'd need a separate stats endpoint.
   const totalOutstanding = invoices.filter((i) => i.status !== "paid" && i.amount > 0).reduce((sum, i) => sum + i.amount, 0)
   const totalCollected = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0)
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <CreditCard className="w-6 h-6 text-primary" />
-            Billing & Invoicing
+            <CreditCard className="w-6 h-6 text-primary" /> Billing & Invoicing
           </h2>
           <p className="text-sm text-muted-foreground mt-1">Live invoice list — mark payments to update status</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <SearchBox value={search} onChange={(v) => { setSearch(v); setPage(1) }} placeholder="Search invoice or deal #..." />
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
+          >
+            <option value="">All statuses</option>
+            <option value="paid">Paid</option>
+            <option value="unpaid">Unpaid</option>
+            <option value="overdue">Overdue</option>
+          </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="glass p-6 rounded-xl border-l-4 border-l-primary shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground mb-2">Total Outstanding</p>
+          <p className="text-sm font-medium text-muted-foreground mb-2">Outstanding (this page)</p>
           <p className="text-3xl font-bold text-foreground tracking-tight">{inr(totalOutstanding)}</p>
         </div>
         <div className="glass p-6 rounded-xl border-l-4 border-l-success shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground mb-2">Total Collected</p>
+          <p className="text-sm font-medium text-muted-foreground mb-2">Collected (this page)</p>
           <p className="text-3xl font-bold text-success tracking-tight">{inr(totalCollected)}</p>
         </div>
         <div className="glass p-6 rounded-xl border-l-4 border-l-info shadow-sm">
-          <p className="text-sm font-medium text-muted-foreground mb-2">Invoices</p>
-          <p className="text-3xl font-bold text-foreground tracking-tight">{invoices.length}</p>
+          <p className="text-sm font-medium text-muted-foreground mb-2">Total invoices</p>
+          <p className="text-3xl font-bold text-foreground tracking-tight">{total}</p>
         </div>
       </div>
 
@@ -121,7 +144,10 @@ export default function Billing() {
         ) : error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
-          <DataTable data={invoices} columns={columns} />
+          <>
+            <DataTable data={invoices} columns={columns} />
+            <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>

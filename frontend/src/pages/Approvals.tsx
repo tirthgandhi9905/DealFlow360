@@ -2,10 +2,13 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
+import { Pagination } from "@/components/ui/Pagination"
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
 }
+
+const PAGE_SIZE = 15
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-warning/10 text-warning",
@@ -16,23 +19,23 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function Approvals() {
   const [approvals, setApprovals] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [filter, setFilter] = useState<string>("pending")
+  const [page, setPage] = useState(1)
   const navigate = useNavigate()
 
-  const load = () => {
+  useEffect(() => {
     setLoading(true)
-    const params: any = { limit: 100 }
+    const params: any = { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
     if (filter) params.status = filter
     api
       .get("/approvals/", { params })
-      .then((r) => setApprovals(r.data.items || []))
+      .then((r) => { setApprovals(r.data.items || []); setTotal(r.data.total || 0) })
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load approvals"))
       .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [filter])
+  }, [filter, page])
 
   const columns = [
     { header: "Deal #", accessorKey: "deal_number" as const, className: "font-medium text-foreground" },
@@ -55,7 +58,7 @@ export default function Approvals() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Approvals Queue</h2>
           <p className="text-sm text-muted-foreground mt-1">Review deals requiring authorization</p>
@@ -64,8 +67,8 @@ export default function Approvals() {
           {["pending", "approved", "rejected", ""].map((f) => (
             <button
               key={f || "all"}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "bg-white border border-border text-muted-foreground hover:bg-slate-50"}`}
+              onClick={() => { setFilter(f); setPage(1) }}
+              className={`px-3 py-1.5 rounded-lg transition-colors capitalize ${filter === f ? "bg-primary text-primary-foreground" : "bg-white border border-border text-muted-foreground hover:bg-slate-50"}`}
             >
               {f || "All"}
             </button>
@@ -79,7 +82,10 @@ export default function Approvals() {
         ) : error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
-          <DataTable data={approvals} columns={columns} onRowClick={(row) => navigate(`/approvals/${row.id}`)} />
+          <>
+            <DataTable data={approvals} columns={columns} onRowClick={(row) => navigate(`/approvals/${row.id}`)} />
+            <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>
