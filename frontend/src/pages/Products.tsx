@@ -3,7 +3,7 @@ import { Box, Settings2, PackagePlus, Tags, Settings, Plus, Trash2 } from "lucid
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
-import { Box, Settings2, PackagePlus, Tags, Settings } from "lucide-react"
+
 
 function inr(n: number): string {
   return `₹${(n || 0).toLocaleString("en-IN")}`
