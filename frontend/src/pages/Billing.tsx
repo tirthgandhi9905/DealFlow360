@@ -184,8 +184,35 @@ export default function Billing() {
               </div>
             </div>
 
+            {/* 4-Node Timeline Stepper */}
+            <div className="bg-white border-b border-border px-12 py-5 hidden sm:block">
+              <div className="flex items-center justify-between relative">
+                <div className="absolute left-4 right-4 top-4 -translate-y-1/2 h-1 bg-slate-100 z-0 rounded-full"></div>
+                <div 
+                  className="absolute left-4 top-4 -translate-y-1/2 h-1 bg-primary z-0 rounded-full transition-all duration-500" 
+                  style={{ width: selectedInvoice.status === 'paid' ? 'calc(100% - 2rem)' : selectedInvoice.status === 'invoiced' ? '66%' : selectedInvoice.status === 'shipped' ? '33%' : '10%' }}
+                ></div>
+                
+                {['Confirmed', 'Shipped', 'Invoiced', 'Paid'].map((step, i) => {
+                  const isActive = 
+                    (selectedInvoice.status === 'paid') || 
+                    (selectedInvoice.status === 'invoiced' && i <= 2) || 
+                    (selectedInvoice.status === 'shipped' && i <= 1) || 
+                    (i === 0);
+                  return (
+                    <div key={step} className="relative z-10 flex flex-col items-center gap-2 bg-white px-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-colors duration-300 ${isActive ? 'bg-primary border-primary text-white shadow-md shadow-primary/20' : 'bg-white border-slate-200 text-slate-400'}`}>
+                        {isActive ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                      </div>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${isActive ? 'text-foreground' : 'text-slate-400'}`}>{step}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
               <div className="flex justify-between items-start mb-8">
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Billed To</h3>

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { Bell, Settings, Search, CheckCircle2, AlertTriangle, ArrowRight, X } from "lucide-react"
+import { Bell, Settings, Search, CheckCircle2, AlertTriangle, ArrowRight, X, RefreshCcw, Monitor, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 const MOCK_NOTIFICATIONS = [
@@ -46,7 +46,20 @@ export default function TopBar() {
   return (
     <header className="h-16 border-b border-border bg-white flex items-center justify-between px-8 sticky top-0 z-10">
       <div className="flex items-center gap-4 flex-1">
-        <div className="relative w-64">
+        <div className="flex bg-slate-100 p-1 rounded-lg border border-border">
+          <button 
+            className="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-foreground"
+          >
+            Quotations
+          </button>
+          <button 
+            className="px-4 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => navigate('/pipeline')}
+          >
+            Pipeline
+          </button>
+        </div>
+        <div className="relative w-64 ml-4">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input 
             type="text" 
@@ -57,6 +70,19 @@ export default function TopBar() {
       </div>
       
       <div className="flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-2">
+          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded transition-colors" onClick={() => window.location.reload()}>
+            <RefreshCcw className="w-3.5 h-3.5" /> Reload Data
+          </button>
+          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded transition-colors" onClick={() => navigate('/settings')}>
+            <Monitor className="w-3.5 h-3.5" /> Go to Back-end
+          </button>
+          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-destructive px-2 py-1.5 rounded transition-colors" onClick={logout}>
+            <LogOut className="w-3.5 h-3.5" /> Close Workspace
+          </button>
+        </div>
+        <div className="h-6 w-px bg-border/50 hidden md:block"></div>
+
         <div className="flex items-center gap-3 text-muted-foreground relative" ref={notifRef}>
           <button 
             className="hover:text-foreground transition-colors relative"

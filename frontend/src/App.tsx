@@ -4,12 +4,14 @@ import AppShell from "@/components/layout/AppShell"
 import Login from "@/pages/Login"
 import Dashboard from "@/pages/Dashboard"
 import Quotes from "@/pages/Quotes"
+import Pipeline from "@/pages/Pipeline"
 import QuoteBuilder from "@/pages/QuoteBuilder"
 import Approvals from "@/pages/Approvals"
 import ApprovalDetail from "@/pages/ApprovalDetail"
 import Fulfillment from "@/pages/Fulfillment"
 import Negotiations from "@/pages/Negotiations"
 import Billing from "@/pages/Billing"
+import Subscriptions from "@/pages/Subscriptions"
 import DealHealth from "@/pages/DealHealth"
 import Products from "@/pages/Products"
 import Customers from "@/pages/Customers"
@@ -31,6 +33,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/quotes" element={<Quotes />} />
+              <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/quotes/new" element={<QuoteBuilder />} />
               <Route path="/quotes/:id" element={<QuoteBuilder />} />
               <Route path="/quotes/:id/edit" element={<QuoteBuilder />} />
@@ -39,6 +42,7 @@ export default function App() {
               <Route path="/fulfillment" element={<Fulfillment />} />
               <Route path="/negotiations" element={<Negotiations />} />
               <Route path="/billing" element={<Billing />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/deal-health" element={<DealHealth />} />
               <Route path="/products" element={<Products />} />
               <Route path="/customers" element={<Customers />} />

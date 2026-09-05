@@ -120,6 +120,14 @@ export default function Login() {
             <span className="font-medium text-foreground">Sales Rep</span>
             <span className="text-muted-foreground"> · ravi@dealflow.in</span>
           </button>
+          <button
+            type="button"
+            onClick={() => fillDemo("finance@dealflow.in")}
+            className="text-left px-3 py-2 rounded-lg border border-border bg-white hover:bg-slate-50 transition-colors"
+          >
+            <span className="font-medium text-foreground">Finance</span>
+            <span className="text-muted-foreground"> · finance@dealflow.in</span>
+          </button>
           <p className="text-center text-muted-foreground mt-1">
             Password for all demo accounts: <span className="font-mono font-medium text-foreground">1234</span>
           </p>

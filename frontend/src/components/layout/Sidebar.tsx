@@ -11,7 +11,8 @@ import {
   HeartPulse, 
   Box, 
   Users,
-  Settings 
+  Settings,
+  Repeat
 } from "lucide-react"
 
 const nav = [
@@ -21,6 +22,7 @@ const nav = [
   { label: "Fulfillment", path: "/fulfillment", icon: Package },
   { label: "Negotiations", path: "/negotiations", icon: Handshake },
   { label: "Billing", path: "/billing", icon: CreditCard },
+  { label: "Subscriptions", path: "/subscriptions", icon: Repeat },
   { label: "Deal Health", path: "/deal-health", icon: HeartPulse },
   { label: "Products", path: "/products", icon: Box },
   { label: "Customers", path: "/customers", icon: Users },

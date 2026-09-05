@@ -53,6 +53,7 @@ export default function QuoteBuilder() {
   const [lines, setLines] = useState<Line[]>([])
   const [upsell, setUpsell] = useState<any>({ current_cart: {}, suggestions: [] })
   const [showAddPicker, setShowAddPicker] = useState(false)
+  const [orderDiscountPercent, setOrderDiscountPercent] = useState<number>(0)
 
   // Digital Twin state
   const [showTwinModal, setShowTwinModal] = useState(false)
@@ -151,12 +152,19 @@ export default function QuoteBuilder() {
 
   const totals = useMemo(() => {
     const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0)
-    const discount = lines.reduce((s, l) => s + l.quantity * l.unit_price * (l.discount_percent / 100), 0)
+    const lineDiscount = lines.reduce((s, l) => s + l.quantity * l.unit_price * (l.discount_percent / 100), 0)
+    const afterLineDiscount = subtotal - lineDiscount
+    const orderDiscount = afterLineDiscount * (orderDiscountPercent / 100)
+    const discount = lineDiscount + orderDiscount
     const net = subtotal - discount
+    
+    const oneTimeTotal = lines.filter(l => !l.product.is_subscription).reduce((s, l) => s + (l.quantity * l.unit_price * (1 - l.discount_percent / 100)), 0) * (1 - orderDiscountPercent / 100)
+    const recurringTotal = lines.filter(l => l.product.is_subscription).reduce((s, l) => s + (l.quantity * l.unit_price * (1 - l.discount_percent / 100)), 0) * (1 - orderDiscountPercent / 100)
+
     const cost = lines.reduce((s, l) => s + l.product.cost * l.quantity, 0)
     const margin = net > 0 ? ((net - cost) / net) * 100 : 0
-    return { subtotal, discount, net, margin }
-  }, [lines])
+    return { subtotal, discount, net, margin, oneTimeTotal, recurringTotal, orderDiscount }
+  }, [lines, orderDiscountPercent])
 
   const loadTwinAlternatives = async () => {
     if (!selectedCustomer) return alert("Select a customer first.")
@@ -201,6 +209,7 @@ export default function QuoteBuilder() {
     try {
       const payload = {
         customer_id: selectedCustomer,
+        order_discount_percent: orderDiscountPercent,
         lines: lines.map((l) => ({
           product_id: l.product.id,
           quantity: l.quantity,
@@ -367,13 +376,17 @@ export default function QuoteBuilder() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <input
-                          type="number" min="1"
-                          value={line.quantity}
-                          disabled={!canEdit}
-                          onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
-                          className="w-full bg-background border border-border rounded px-2 py-1 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
-                        />
+                        <div className="flex items-center gap-1 bg-background border border-border rounded px-1 py-1">
+                          <button disabled={!canEdit} onClick={() => updateLine(idx, "quantity", Math.max(1, line.quantity - 1))} className="px-2 hover:bg-slate-100 disabled:opacity-50 rounded">-</button>
+                          <input
+                            type="number" min="1"
+                            value={line.quantity}
+                            disabled={!canEdit}
+                            onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
+                            className="w-10 text-center bg-transparent border-0 focus:ring-0 p-0 disabled:opacity-60 text-sm"
+                          />
+                          <button disabled={!canEdit} onClick={() => updateLine(idx, "quantity", line.quantity + 1)} className="px-2 hover:bg-slate-100 disabled:opacity-50 rounded">+</button>
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         <input
@@ -385,15 +398,22 @@ export default function QuoteBuilder() {
                         />
                       </td>
                       <td className="px-4 py-4">
-                        <div className="relative flex items-center">
-                          <input
-                            type="number" min="0" max="100"
-                            value={line.discount_percent}
-                            disabled={!canEdit}
-                            onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
-                            className="w-full bg-background border border-border rounded px-2 py-1 pr-7 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
-                          />
-                          <span className="absolute right-2 text-muted-foreground">%</span>
+                        <div className="relative flex flex-col">
+                          <div className="flex items-center">
+                            <input
+                              type="number" min="0" max="100"
+                              value={line.discount_percent}
+                              disabled={!canEdit}
+                              onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
+                              className="w-full bg-background border border-border rounded px-2 py-1 pr-7 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
+                            />
+                            <span className="absolute right-2 text-muted-foreground">%</span>
+                          </div>
+                          {line.discount_percent > 10 && (
+                            <span className="text-[10px] text-destructive mt-1 flex items-center gap-1 font-medium bg-destructive/10 px-1 py-0.5 rounded">
+                              <AlertCircle className="w-3 h-3" /> Exceeds tier limit (10%)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4 font-medium">{inr(finalPrice)}</td>
@@ -453,10 +473,32 @@ export default function QuoteBuilder() {
                 <span>Discount</span>
                 <span>-{inr(totals.discount)}</span>
               </div>
+              {canEdit && (
+                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-border mt-2">
+                  <span className="text-muted-foreground text-xs font-medium">Order Discount</span>
+                  <div className="relative w-20">
+                    <input 
+                      type="number" 
+                      value={orderDiscountPercent} 
+                      onChange={e => setOrderDiscountPercent(Number(e.target.value))} 
+                      className="w-full bg-white border border-border rounded px-2 py-1 text-right text-xs pr-6 focus:ring-1 focus:ring-primary focus:outline-none" 
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )}
               <div className="h-px bg-border my-2"></div>
               <div className="flex justify-between font-bold text-lg text-foreground">
                 <span>Total</span>
                 <span>{inr(totals.net)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                <span>One-Time Products</span>
+                <span>{inr(totals.oneTimeTotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-primary font-medium pt-1">
+                <span>Recurring /mo</span>
+                <span>{inr(totals.recurringTotal)}</span>
               </div>
             </div>
           </div>
@@ -523,12 +565,20 @@ export default function QuoteBuilder() {
                             {s.margin_delta_if_added > 0 ? "+" : ""}{s.margin_delta_if_added}% margin
                           </span>
                           {prod && (
-                           <button
-                              onClick={() => addProduct(prod)}
-                              className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors"
-                            >
-                              Add
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setUpsell((prev: any) => ({ ...prev, suggestions: prev.suggestions.filter((x: any) => x.product_id !== s.product_id) }))}
+                                className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+                              >
+                                Dismiss
+                              </button>
+                              <button
+                                onClick={() => addProduct(prod)}
+                                className="text-xs bg-primary/10 text-primary px-3 py-1 rounded hover:bg-primary hover:text-white transition-colors font-medium"
+                              >
+                                Add
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>

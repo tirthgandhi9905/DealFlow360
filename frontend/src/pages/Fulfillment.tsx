@@ -293,13 +293,23 @@ export default function Fulfillment() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-end gap-3">
-              <button className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-                Consolidate Backorders
-              </button>
-              <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2">
-                <Settings2 className="w-4 h-4" /> Re-Optimize Split
-              </button>
+            <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <button className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors text-muted-foreground">
+                  Manual Override
+                </button>
+                <button className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                  Consolidate Backorders
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <button className="px-4 py-2 bg-white text-primary border border-primary rounded-lg text-sm font-medium hover:bg-primary/5 transition-colors flex items-center gap-2">
+                  <Settings2 className="w-4 h-4" /> Re-Optimize
+                </button>
+                <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-sm">
+                  <CheckCircle2 className="w-4 h-4" /> Accept Split
+                </button>
+              </div>
             </div>
           </div>
         </div>

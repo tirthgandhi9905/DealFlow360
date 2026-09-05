@@ -59,10 +59,30 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4 mb-2">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Sales Dashboard</h2>
           <p className="text-sm text-muted-foreground mt-1">Live snapshot of pipeline, collections, and risk</p>
+        </div>
+        <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-border shadow-sm flex-wrap">
+          <select className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
+            <option>All Dates (YTD)</option>
+            <option>This Quarter</option>
+            <option>Last 30 Days</option>
+          </select>
+          <select className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
+            <option>All Teams</option>
+            <option>North America</option>
+            <option>EMEA</option>
+            <option>APAC</option>
+          </select>
+          <div className="hidden sm:block h-6 w-px bg-border mx-1"></div>
+          <button onClick={() => window.print()} className="px-3 py-1.5 bg-primary/5 border border-primary/20 text-primary rounded text-sm font-medium hover:bg-primary/10 transition-colors">
+            PDF Export
+          </button>
+          <button className="px-3 py-1.5 bg-success/5 border border-success/20 text-success rounded text-sm font-medium hover:bg-success/10 transition-colors">
+            XLS Export
+          </button>
         </div>
       </div>
 

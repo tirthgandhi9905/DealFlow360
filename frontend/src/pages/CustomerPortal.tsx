@@ -19,6 +19,9 @@ export default function CustomerPortal() {
   const [counterPct, setCounterPct] = useState<number | "">("")
   const [busy, setBusy] = useState("")
   const [proposal, setProposal] = useState<any>(null)
+  
+  const [lineComments, setLineComments] = useState<Record<string, string>>({})
+  const [deliveryDate, setDeliveryDate] = useState<string>("")
 
   // token could either be a Quote UUID or a Deal UUID passed as a token. Try quote-view endpoint first.
   const load = () => {
@@ -40,6 +43,8 @@ export default function CustomerPortal() {
       const r = await publicApi.post(`/negotiations/portal/quote/${token}/submit-request`, {
         customer_request: request,
         counter_discount_percent: counterPct === "" ? undefined : Number(counterPct),
+        requested_delivery_date: deliveryDate || undefined,
+        line_comments: lineComments,
       })
       setProposal(r.data)
       load()
@@ -106,7 +111,7 @@ export default function CustomerPortal() {
               Deal {quote.deal_number} · Status: <span className="capitalize">{String(quote.deal_status).replace(/_/g, " ")}</span>
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-border bg-white rounded shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors">
+          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 border border-border bg-white rounded shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors">
             <Download className="w-4 h-4" /> Download PDF
           </button>
         </div>
@@ -142,15 +147,24 @@ export default function CustomerPortal() {
               </thead>
               <tbody className="divide-y divide-border">
                 {quote.lines.map((item: any) => (
-                  <tr key={item.id}>
-                    <td className="py-4 font-medium">
+                  <tr key={item.id} className="group border-b border-border/50">
+                    <td className="py-4 font-medium align-top">
                       {item.product_name}
                       <div className="text-xs text-muted-foreground">{item.product_sku}</div>
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          placeholder="Add a question or comment about this item..."
+                          value={lineComments[item.id] || ""}
+                          onChange={(e) => setLineComments({ ...lineComments, [item.id]: e.target.value })}
+                          className="w-full text-xs border border-border rounded px-2 py-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary transition-colors placeholder:text-slate-400"
+                        />
+                      </div>
                     </td>
-                    <td className="py-4 text-right">{item.quantity}</td>
-                    <td className="py-4 text-right">{inr(item.unit_price)}</td>
-                    <td className="py-4 text-right">{item.discount_percent}%</td>
-                    <td className="py-4 text-right font-medium">{inr(item.line_total)}</td>
+                    <td className="py-4 text-right align-top">{item.quantity}</td>
+                    <td className="py-4 text-right align-top">{inr(item.unit_price)}</td>
+                    <td className="py-4 text-right align-top">{item.discount_percent}%</td>
+                    <td className="py-4 text-right font-medium align-top">{inr(item.line_total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -192,23 +206,40 @@ export default function CustomerPortal() {
               placeholder="e.g. Can we get 12% additional discount on the hardware lines?"
               className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <div className="flex gap-3 items-center">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                placeholder="Counter %"
-                value={counterPct}
-                onChange={(e) => setCounterPct(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-32 text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <button
-                onClick={submitRequest}
-                disabled={busy === "submit"}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-all disabled:opacity-50"
-              >
-                {busy === "submit" ? "Generating…" : "Get AI Counter-Proposals"}
-              </button>
+            <div className="flex gap-4 items-center flex-wrap pt-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Requested Delivery Date</label>
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  className="w-48 text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary text-slate-600 font-medium"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Target Discount</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="e.g. 15"
+                    value={counterPct}
+                    onChange={(e) => setCounterPct(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-32 text-sm border border-border rounded-lg pl-3 pr-8 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">%</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5 self-end">
+                <button
+                  onClick={submitRequest}
+                  disabled={busy === "submit"}
+                  className="h-[38px] px-6 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-all shadow-sm shadow-primary/20 disabled:opacity-50"
+                >
+                  {busy === "submit" ? "Generating…" : "Get AI Counter-Proposals"}
+                </button>
+              </div>
             </div>
           </div>
 
