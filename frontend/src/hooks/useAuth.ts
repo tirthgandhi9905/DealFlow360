@@ -7,10 +7,21 @@ export function useAuth() {
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) { setLoading(false); return }
-    api.get("/auth/me").then((r) => setUser(r.data)).catch(() => localStorage.removeItem("token")).finally(() => setLoading(false))
+    // Mock user verification
+    setTimeout(() => {
+      setUser({ id: "1", email: "admin@company.com", name: "Demo User", role: "Sales Rep" })
+      setLoading(false)
+    }, 300)
   }, [])
   const login = async (email: string, password: string) => {
-    const r = await api.post("/auth/login", { email, password }); localStorage.setItem("token", r.data.access_token); setUser(r.data.user)
+    // Mock successful login
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        localStorage.setItem("token", "mock_token")
+        setUser({ id: "1", email, name: "Demo User", role: "Sales Rep" })
+        resolve()
+      }, 500)
+    })
   }
   const logout = () => { localStorage.removeItem("token"); setUser(null) }
   return { user, loading, login, logout }
