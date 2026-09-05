@@ -1,18 +1,24 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
 from app.config import settings
 from app.models.user import User, UserRole
-from app.auth.oauth import oauth
+from app.auth.dependencies import get_current_user
+import hashlib
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return hashlib.sha256(password.encode()).hexdigest() == hashed
 
 
 class LoginRequest(BaseModel):
@@ -24,7 +30,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     name: str
     password: str
-    role: UserRole = UserRole.SALES_REP
+    role: UserRole = UserRole.ADMIN
 
 
 def create_token(user_id: str) -> str:
@@ -40,46 +46,23 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     user = User(
         email=data.email,
         name=data.name,
-        hashed_password=pwd_context.hash(data.password),
+        hashed_password=hash_password(data.password),
         role=data.role,
     )
     db.add(user)
     await db.flush()
-    return {"access_token": create_token(user.id), "user": {"id": str(user.id), "email": user.email, "name": user.name, "role": user.role}}
+    return {"access_token": create_token(user.id), "user": {"id": str(user.id), "email": user.email, "name": user.name, "role": user.role.value}}
 
 
 @router.post("/login")
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
-    if not user or not user.hashed_password or not pwd_context.verify(data.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(data.password, user.hashed_password):
         raise HTTPException(401, "Invalid credentials")
-    return {"access_token": create_token(user.id), "user": {"id": str(user.id), "email": user.email, "name": user.name, "role": user.role}}
-
-
-@router.get("/google")
-async def google_login(request: Request):
-    return await oauth.google.authorize_redirect(request, settings.OAUTH_REDIRECT_URI)
-
-
-@router.get("/callback")
-async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
-    token = await oauth.google.authorize_access_token(request)
-    userinfo = token.get("userinfo", {})
-    email = userinfo.get("email")
-    if not email:
-        raise HTTPException(400, "No email from OAuth")
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if not user:
-        user = User(email=email, name=userinfo.get("name", email), oauth_provider="google", oauth_id=userinfo.get("sub"))
-        db.add(user)
-        await db.flush()
-    access_token = create_token(user.id)
-    return RedirectResponse(f"{settings.FRONTEND_URL}?token={access_token}")
+    return {"access_token": create_token(user.id), "user": {"id": str(user.id), "email": user.email, "name": user.name, "role": user.role.value}}
 
 
 @router.get("/me")
-async def me(db: AsyncSession = Depends(get_db)):
-    from app.auth.dependencies import get_current_user
-    return {"status": "use Authorization header"}
+async def me(user: User = Depends(get_current_user)):
+    return {"id": str(user.id), "email": user.email, "name": user.name, "role": user.role.value}

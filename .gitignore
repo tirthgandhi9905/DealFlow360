@@ -1,0 +1,65 @@
+# ══════════════════════════════════════
+# Python
+# ══════════════════════════════════════
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ══════════════════════════════════════
+# Node / React / Vite
+# ══════════════════════════════════════
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# ══════════════════════════════════════
+# Environment
+# ══════════════════════════════════════
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ══════════════════════════════════════
+# Docker
+# ══════════════════════════════════════
+pgdata/
+docker-compose.override.yml
+
+# ══════════════════════════════════════
+# IDE
+# ══════════════════════════════════════
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ══════════════════════════════════════
+# Logs
+# ══════════════════════════════════════
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# ══════════════════════════════════════
+# Misc
+# ══════════════════════════════════════
+*.sqlite3
+*.db
+.env.example
+!.env.example
