@@ -3,10 +3,7 @@ import { useNavigate } from "react-router-dom"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { Pagination } from "@/components/ui/Pagination"
-
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
@@ -18,6 +15,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function Approvals() {
+  const { formatAmount } = useCurrency()
   const [approvals, setApprovals] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -42,7 +40,7 @@ export default function Approvals() {
     { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
     { header: "Tier", cell: (r: any) => <span className="text-xs uppercase text-muted-foreground">{r.customer_tier}</span> },
     { header: "Sales Rep", cell: (r: any) => <span className="text-muted-foreground">{r.sales_rep_name}</span> },
-    { header: "Amount", cell: (r: any) => <span className="font-medium">{inr(r.deal_amount)}</span> },
+    { header: "Amount", cell: (r: any) => <span className="font-medium">{formatAmount(r.deal_amount)}</span> },
     { header: "Margin", cell: (r: any) => <span className={r.deal_margin >= 30 ? "text-success" : r.deal_margin >= 15 ? "text-warning" : "text-destructive"}>{r.deal_margin?.toFixed(1)}%</span> },
     {
       header: "Risk",

@@ -30,6 +30,7 @@ const DEAL_STATUS_STYLES: Record<string, string> = {
 type Tab = "deals" | "quotes" | "negotiations" | "invoices"
 
 export default function CustomerDetail() {
+  const { formatAmount } = useCurrency()
   const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState<any>(null)
@@ -81,8 +82,8 @@ export default function CustomerDetail() {
             <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
             <div className="p-1.5 bg-primary/10 rounded-md"><DollarSign className="w-4 h-4 text-primary" /></div>
           </div>
-          <p className="text-2xl font-bold text-foreground tracking-tight">{inr(stats.total_revenue)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Pipeline: {inr(stats.total_pipeline)}</p>
+          <p className="text-2xl font-bold text-foreground tracking-tight">{formatAmount(stats.total_revenue)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Pipeline: {formatAmount(stats.total_pipeline)}</p>
         </div>
         <div className="glass p-6 rounded-xl border-l-4 border-l-success shadow-sm">
           <div className="flex justify-between items-start mb-2">
@@ -105,8 +106,8 @@ export default function CustomerDetail() {
             <p className="text-sm font-medium text-muted-foreground">Outstanding</p>
             <div className="p-1.5 bg-warning/10 rounded-md"><AlertCircle className="w-4 h-4 text-warning" /></div>
           </div>
-          <p className="text-2xl font-bold text-warning tracking-tight">{inr(stats.total_outstanding)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Paid: {inr(stats.total_paid)}</p>
+          <p className="text-2xl font-bold text-warning tracking-tight">{formatAmount(stats.total_outstanding)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Paid: {formatAmount(stats.total_paid)}</p>
         </div>
       </div>
 
@@ -153,7 +154,7 @@ export default function CustomerDetail() {
                   <tr key={d.id} className="hover:bg-slate-50">
                     <td className="px-3 py-2 font-medium text-foreground">{d.deal_number}</td>
                     <td className="px-3 py-2 text-muted-foreground">{d.sales_rep_name}</td>
-                    <td className="px-3 py-2 text-right font-medium">{inr(d.total_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatAmount(d.total_amount)}</td>
                     <td className={`px-3 py-2 text-right ${d.margin_percent >= 30 ? "text-success" : d.margin_percent >= 15 ? "text-warning" : "text-destructive"}`}>{d.margin_percent?.toFixed(1)}%</td>
                     <td className="px-3 py-2 text-right">{d.risk_score}</td>
                     <td className="px-3 py-2"><span className={`text-xs font-medium px-2 py-0.5 rounded capitalize ${DEAL_STATUS_STYLES[d.status] || "bg-slate-100"}`}>{String(d.status).replace(/_/g, " ")}</span></td>
@@ -185,7 +186,7 @@ export default function CustomerDetail() {
                     <td className="px-3 py-2 text-muted-foreground">{q.deal_number}</td>
                     <td className="px-3 py-2 text-center">v{q.version}</td>
                     <td className="px-3 py-2 text-center">{q.edit_count > 0 ? <span className="text-primary font-medium">{q.edit_count}</span> : <span className="text-muted-foreground">—</span>}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{inr(q.grand_total)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatAmount(q.grand_total)}</td>
                     <td className="px-3 py-2 text-muted-foreground text-xs">{q.created_at ? new Date(q.created_at).toLocaleDateString() : "—"}</td>
                     <td className="px-3 py-2">
                       <button onClick={() => navigate(`/quotes/${q.id}`)} className="text-xs text-primary hover:underline">View</button>
@@ -236,7 +237,7 @@ export default function CustomerDetail() {
                 {invoices.map((i: any) => (
                   <tr key={i.id} className="hover:bg-slate-50">
                     <td className="px-3 py-2 font-medium text-foreground">{i.invoice_number}</td>
-                    <td className={`px-3 py-2 text-right font-medium ${i.amount < 0 ? "text-destructive" : ""}`}>{inr(i.amount)}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${i.amount < 0 ? "text-destructive" : ""}`}>{formatAmount(i.amount)}</td>
                     <td className="px-3 py-2 text-muted-foreground text-xs">{i.due_date ? new Date(i.due_date).toLocaleDateString() : "—"}</td>
                     <td className="px-3 py-2"><span className={`text-xs font-medium px-2 py-0.5 rounded ${i.status === "paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>{i.status}</span></td>
                     <td className="px-3 py-2 text-muted-foreground text-xs">{i.paid_at ? new Date(i.paid_at).toLocaleDateString() : "—"}</td>

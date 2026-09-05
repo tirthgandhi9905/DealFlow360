@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { MetricCard } from "@/components/ui/MetricCard"
 import api from "@/lib/api"
-import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
 import { DollarSign, Clock, AlertTriangle, TrendingUp } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -14,23 +14,21 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "hsl(0 84% 60%)",
 }
 
-function inr(n: number): string {
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`
-  return `₹${Math.round(n).toLocaleString()}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 export default function Dashboard() {
+  const { formatAmount } = useCurrency()
   const [metrics, setMetrics] = useState<any>(null)
   const [error, setError] = useState("")
+  const [dateRange, setDateRange] = useState("ytd")
+  const [team, setTeam] = useState("all")
 
   useEffect(() => {
     api
-      .get("/dashboard/")
+      .get("/dashboard/", { params: { date_range: dateRange, team: team } })
       .then((r) => setMetrics(r.data))
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load dashboard"))
-  }, [])
+  }, [dateRange, team])
 
   if (error) {
     return (
@@ -65,23 +63,20 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground mt-1">Live snapshot of pipeline, collections, and risk</p>
         </div>
         <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-border shadow-sm flex-wrap">
-          <select className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
-            <option>All Dates (YTD)</option>
-            <option>This Quarter</option>
-            <option>Last 30 Days</option>
+          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
+            <option value="ytd">All Dates (YTD)</option>
+            <option value="this_quarter">This Quarter</option>
+            <option value="last_30_days">Last 30 Days</option>
           </select>
-          <select className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
-            <option>All Teams</option>
-            <option>North America</option>
-            <option>EMEA</option>
-            <option>APAC</option>
+          <select value={team} onChange={(e) => setTeam(e.target.value)} className="px-3 py-1.5 bg-slate-50 border border-border rounded text-sm focus:outline-none hover:border-primary transition-colors cursor-pointer font-medium text-slate-700">
+            <option value="all">All Teams</option>
+            <option value="na">North America</option>
+            <option value="emea">EMEA</option>
+            <option value="apac">APAC</option>
           </select>
           <div className="hidden sm:block h-6 w-px bg-border mx-1"></div>
           <button onClick={() => window.print()} className="px-3 py-1.5 bg-primary/5 border border-primary/20 text-primary rounded text-sm font-medium hover:bg-primary/10 transition-colors">
             PDF Export
-          </button>
-          <button className="px-3 py-1.5 bg-success/5 border border-success/20 text-success rounded text-sm font-medium hover:bg-success/10 transition-colors">
-            XLS Export
           </button>
         </div>
       </div>
@@ -89,7 +84,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Revenue"
-          value={inr(fin.total_revenue || 0)}
+          value={formatAmount(fin.total_revenue || 0)}
           icon={<DollarSign className="w-5 h-5" />}
           glowColor="primary"
         />
@@ -120,7 +115,7 @@ export default function Dashboard() {
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <BarChart
                 data={[
                   { name: "Gross Profit", value: fin.gross_profit || 0 },
                   { name: "Collected", value: fin.total_collected || 0 },
@@ -130,20 +125,15 @@ export default function Dashboard() {
                 ]}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
                 <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => inr(v)} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAmount(v)} />
                 <RechartsTooltip
+                  cursor={{fill: 'transparent'}}
                   contentStyle={{ backgroundColor: "white", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
-                  formatter={(v: any) => inr(Number(v))}
+                  formatter={(v: any) => formatAmount(Number(v))}
                 />
-                <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-              </AreaChart>
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -155,7 +145,7 @@ export default function Dashboard() {
           <div className="h-64 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={distribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
+                <Pie data={distribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
                   {distribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
@@ -175,12 +165,12 @@ export default function Dashboard() {
         <div className="h-52 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={riskData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={(e) => `${e.name}: ${e.value}`}>
+              <Pie data={riskData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none" label={(e) => `${e.name}: ${e.value}`}>
                 {riskData.map((entry, index) => (
                   <Cell key={`risk-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <RechartsTooltip />
+              <RechartsTooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
             </PieChart>
           </ResponsiveContainer>
         </div>

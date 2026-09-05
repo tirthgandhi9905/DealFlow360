@@ -66,6 +66,10 @@ async def list_fulfillments(
 
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
 
+    # Get global shipping cost total
+    total_shipping_query = select(func.sum(Fulfillment.total_shipping_cost)).select_from(query.subquery())
+    global_shipping_cost = (await db.execute(total_shipping_query)).scalar() or 0.0
+
     query = query.order_by(Fulfillment.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     rows = result.all()
@@ -107,7 +111,11 @@ async def list_fulfillments(
             ],
         })
 
-    return {"total": total, "items": items}
+    return {
+        "total": total, 
+        "global_shipping_cost": global_shipping_cost,
+        "items": items
+    }
 
 
 @router.post("/optimize")

@@ -6,10 +6,7 @@ import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { toast } from "@/components/ui/use-toast"
 import { Users, Plus } from "lucide-react"
-
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
@@ -21,6 +18,7 @@ const TIER_STYLES: Record<string, string> = {
 }
 
 export default function Customers() {
+  const { formatAmount } = useCurrency()
   const [customers, setCustomers] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -64,7 +62,7 @@ export default function Customers() {
       const tier = String(r.tier || "").toLowerCase()
       return <span className={`text-xs font-medium px-2 py-0.5 rounded ${TIER_STYLES[tier] || "bg-slate-100 text-slate-600"}`}>{tier.toUpperCase() || "—"}</span>
     }},
-    { header: "Lifetime Value", cell: (r: any) => <span className="font-medium">{inr(r.lifetime_value || 0)}</span> },
+    { header: "Lifetime Value", cell: (r: any) => <span className="font-medium">{formatAmount(r.lifetime_value || 0)}</span> },
     { header: "Phone", cell: (r: any) => <span className="text-muted-foreground">{r.phone || "—"}</span> },
   ]
 

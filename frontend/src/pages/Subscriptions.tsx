@@ -5,14 +5,14 @@ import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { Repeat, Calendar, CheckCircle2, Clock, PauseCircle, Ban, Eye, Settings, FileText, ArrowRight } from "lucide-react"
+import { Repeat, Calendar, CheckCircle2, Clock, PauseCircle, Ban, Eye, Settings, FileText, ArrowRight, X } from "lucide-react"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function Subscriptions() {
+  const { formatAmount } = useCurrency()
   const [subs, setSubs] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -63,7 +63,7 @@ export default function Subscriptions() {
     { header: "Contract #", accessorKey: "deal_number" as const, className: "font-medium text-primary" },
     { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
     { header: "Cycle", cell: (r: any) => <span className="capitalize text-muted-foreground">{r.cycle}</span> },
-    { header: "Recurring", cell: (r: any) => <span className="font-semibold text-foreground">{inr(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
+    { header: "Recurring", cell: (r: any) => <span className="font-semibold text-foreground">{formatAmount(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
     { header: "Next Bill Date", cell: (r: any) => <span className="text-slate-600 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> {r.next_billing_date ? new Date(r.next_billing_date).toLocaleDateString() : "—"}</span> },
     { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
     {
@@ -171,7 +171,7 @@ export default function Subscriptions() {
                 <div className="bg-white p-4 rounded-xl border border-border shadow-sm">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Next Bill Date</p>
                   <p className="text-lg font-bold text-foreground">{selectedSub.next_billing_date ? new Date(selectedSub.next_billing_date).toLocaleDateString() : "—"}</p>
-                  <p className="text-xs text-slate-500 mt-1">Amount: {inr(selectedSub.recurring_total)}</p>
+                  <p className="text-xs text-slate-500 mt-1">Amount: {formatAmount(selectedSub.recurring_total)}</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex flex-col justify-center">
                   <button onClick={handleModify} className="w-full mb-2 bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -203,8 +203,8 @@ export default function Subscriptions() {
                         <tr>
                           <td className="py-3 px-4 font-medium">Enterprise Software License</td>
                           <td className="py-3 px-4 text-right">50</td>
-                          <td className="py-3 px-4 text-right">{inr(selectedSub.recurring_total / 50)}</td>
-                          <td className="py-3 px-4 text-right font-medium text-primary">{inr(selectedSub.recurring_total)}</td>
+                          <td className="py-3 px-4 text-right">{formatAmount(selectedSub.recurring_total / 50)}</td>
+                          <td className="py-3 px-4 text-right font-medium text-primary">{formatAmount(selectedSub.recurring_total)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -230,8 +230,8 @@ export default function Subscriptions() {
                           <tr>
                             <td className="py-3 px-4 text-slate-600">Implementation & Onboarding</td>
                             <td className="py-3 px-4 text-right text-slate-600">1</td>
-                            <td className="py-3 px-4 text-right text-slate-600">{inr(selectedSub.one_time_total)}</td>
-                            <td className="py-3 px-4 text-right font-medium text-slate-700">{inr(selectedSub.one_time_total)}</td>
+                            <td className="py-3 px-4 text-right text-slate-600">{formatAmount(selectedSub.one_time_total)}</td>
+                            <td className="py-3 px-4 text-right font-medium text-slate-700">{formatAmount(selectedSub.one_time_total)}</td>
                           </tr>
                         ) : (
                           <tr>

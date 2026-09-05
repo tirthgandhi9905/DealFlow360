@@ -7,11 +7,10 @@ import { toast } from "@/components/ui/use-toast"
 // This page is public — no auth required. Uses raw axios instead of `api` (which auto-injects token & 401 redirects to /login).
 const publicApi = axios.create({ baseURL: "/api" })
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 export default function CustomerPortal() {
+  const { formatAmount } = useCurrency()
   const { token } = useParams()
   const [quote, setQuote] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -163,9 +162,9 @@ export default function CustomerPortal() {
                       </div>
                     </td>
                     <td className="py-4 text-right align-top">{item.quantity}</td>
-                    <td className="py-4 text-right align-top">{inr(item.unit_price)}</td>
+                    <td className="py-4 text-right align-top">{formatAmount(item.unit_price)}</td>
                     <td className="py-4 text-right align-top">{item.discount_percent}%</td>
-                    <td className="py-4 text-right font-medium align-top">{inr(item.line_total)}</td>
+                    <td className="py-4 text-right font-medium align-top">{formatAmount(item.line_total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -176,19 +175,19 @@ export default function CustomerPortal() {
             <div className="w-64 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{inr(quote.subtotal)}</span>
+                <span className="font-medium">{formatAmount(quote.subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-success">
                 <span>Discount</span>
-                <span>-{inr(quote.total_discount)}</span>
+                <span>-{formatAmount(quote.total_discount)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tax</span>
-                <span>{inr(quote.tax_amount)}</span>
+                <span>{formatAmount(quote.tax_amount)}</span>
               </div>
               <div className="pt-3 border-t border-border flex justify-between font-bold text-lg">
                 <span>Grand Total</span>
-                <span>{inr(quote.grand_total)}</span>
+                <span>{formatAmount(quote.grand_total)}</span>
               </div>
             </div>
           </div>

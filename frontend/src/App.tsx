@@ -2,9 +2,9 @@ import { Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import AppShell from "@/components/layout/AppShell"
 import Login from "@/pages/Login"
+import { CurrencyProvider } from "@/context/CurrencyContext"
 import Dashboard from "@/pages/Dashboard"
 import Quotes from "@/pages/Quotes"
-import Pipeline from "@/pages/Pipeline"
 import QuoteBuilder from "@/pages/QuoteBuilder"
 import Approvals from "@/pages/Approvals"
 import ApprovalDetail from "@/pages/ApprovalDetail"
@@ -27,7 +27,7 @@ export default function App() {
   if (!user) return <Routes><Route path="*" element={<Login />} /></Routes>
 
   return (
-    <>
+    <CurrencyProvider>
       <Routes>
         <Route path="/portal/:token" element={<CustomerPortal />} />
         <Route path="/*" element={
@@ -35,7 +35,6 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/quotes" element={<Quotes />} />
-              <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/quotes/new" element={<QuoteBuilder />} />
               <Route path="/quotes/:id" element={<QuoteBuilder />} />
               <Route path="/quotes/:id/edit" element={<QuoteBuilder />} />
@@ -57,6 +56,6 @@ export default function App() {
         } />
       </Routes>
       <Toaster />
-    </>
+    </CurrencyProvider>
   )
 }

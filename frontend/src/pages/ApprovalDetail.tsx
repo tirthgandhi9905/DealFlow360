@@ -4,11 +4,10 @@ import api from "@/lib/api"
 import { useAuth } from "@/hooks/useAuth"
 import { Check, X, AlertTriangle, ArrowLeft, Send } from "lucide-react"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 export default function ApprovalDetail() {
+  const { formatAmount } = useCurrency()
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -100,7 +99,7 @@ export default function ApprovalDetail() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Total Amount</p>
-                <p className="text-lg font-semibold">{inr(detail.deal_amount)}</p>
+                <p className="text-lg font-semibold">{formatAmount(detail.deal_amount)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Margin</p>

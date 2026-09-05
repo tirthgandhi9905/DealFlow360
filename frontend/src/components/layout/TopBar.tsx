@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
+import { useCurrency } from "@/context/CurrencyContext"
 import { Bell, Settings, Search, CheckCircle2, AlertTriangle, ArrowRight, X, RefreshCcw, Monitor, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
@@ -13,6 +14,7 @@ const MOCK_NOTIFICATIONS = [
 
 export default function TopBar() {
   const { user, logout } = useAuth()
+  const { currency, setCurrency } = useCurrency()
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS)
@@ -46,27 +48,7 @@ export default function TopBar() {
   return (
     <header className="h-16 border-b border-border bg-white flex items-center justify-between px-8 sticky top-0 z-10">
       <div className="flex items-center gap-4 flex-1">
-        <div className="flex bg-slate-100 p-1 rounded-lg border border-border">
-          <button 
-            className="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-foreground"
-          >
-            Quotations
-          </button>
-          <button 
-            className="px-4 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => navigate('/pipeline')}
-          >
-            Pipeline
-          </button>
-        </div>
-        <div className="relative w-64 ml-4">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Search deals, customers..." 
-            className="w-full bg-slate-100 border border-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
+        {/* Removed Pipeline/Quotations and Search as per request */}
       </div>
       
       <div className="flex items-center gap-6">
@@ -141,6 +123,19 @@ export default function TopBar() {
           >
             <Settings className="w-5 h-5" />
           </button>
+        </div>
+
+        <div className="flex items-center ml-2 border border-border rounded-lg bg-slate-50 overflow-hidden text-sm font-medium">
+          <select 
+            value={currency} 
+            onChange={(e) => setCurrency(e.target.value as any)}
+            className="bg-transparent pl-3 pr-2 py-1.5 focus:outline-none cursor-pointer hover:bg-slate-100 transition-colors"
+          >
+            <option value="INR">₹ INR</option>
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
+            <option value="GBP">£ GBP</option>
+          </select>
         </div>
         
         <div className="h-6 w-px bg-border/50"></div>

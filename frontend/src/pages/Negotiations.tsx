@@ -6,13 +6,12 @@ import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { Handshake, ExternalLink } from "lucide-react"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function Negotiations() {
+  const { formatAmount } = useCurrency()
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -62,14 +61,14 @@ export default function Negotiations() {
     },
     { header: "Tier", cell: (r: any) => <span className="text-xs uppercase text-muted-foreground">{r.customer_tier}</span> },
     { header: "Round", cell: (r: any) => <span className="font-medium">#{r.round_count}</span> },
-    { header: "Deal Amount", cell: (r: any) => <span className="font-medium">{inr(r.deal_amount)}</span> },
+    { header: "Deal Amount", cell: (r: any) => <span className="font-medium">{formatAmount(r.deal_amount)}</span> },
     { header: "Margin", cell: (r: any) => <span className={r.deal_margin >= 30 ? "text-success" : "text-warning"}>{r.deal_margin?.toFixed(1)}%</span> },
     {
       header: "Concession Budget",
       cell: (r: any) => (
         <div className="text-xs">
-          <div className="text-muted-foreground">Used: {inr(r.concession_budget?.used || 0)}</div>
-          <div className="text-success">Left: {inr(r.concession_budget?.remaining || 0)}</div>
+          <div className="text-muted-foreground">Used: {formatAmount(r.concession_budget?.used || 0)}</div>
+          <div className="text-success">Left: {formatAmount(r.concession_budget?.remaining || 0)}</div>
         </div>
       ),
     },

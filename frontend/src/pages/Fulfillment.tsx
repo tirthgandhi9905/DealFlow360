@@ -5,15 +5,15 @@ import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { Package, Truck, CheckCircle2, Clock, MapPin, X, BarChart, Settings2 } from "lucide-react"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function Fulfillment() {
+  const { formatAmount } = useCurrency()
   const [orders, setOrders] = useState<any[]>([])
-  const [total, setTotal] = useState(0)
+  const [totalItems, setTotalItems] = useState(0)
+  const [globalShippingCost, setGlobalShippingCost] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
@@ -25,12 +25,13 @@ export default function Fulfillment() {
 
   const load = () => {
     setLoading(true)
-    const params: any = { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
-    if (search) params.search = search
-    if (statusFilter) params.status = statusFilter
     api
-      .get("/fulfillment/", { params })
-      .then((r) => { setOrders(r.data.items || []); setTotal(r.data.total || 0) })
+      .get(`/fulfillment/?skip=${(page - 1) * PAGE_SIZE}&limit=${PAGE_SIZE}${search ? `&search=${search}` : ""}${statusFilter ? `&status=${statusFilter}` : ""}`)
+      .then((r) => { 
+        setOrders(r.data.items || []); 
+        setTotalItems(r.data.total || 0);
+        setGlobalShippingCost(r.data.global_shipping_cost || 0);
+      })
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load fulfillment"))
       .finally(() => setLoading(false))
   }
@@ -69,7 +70,7 @@ export default function Fulfillment() {
         )
       },
     },
-    { header: "Shipping Cost", cell: (r: any) => <span className="font-medium">{inr(r.total_shipping_cost)}</span> },
+    { header: "Shipping Cost", cell: (r: any) => <span className="font-medium">{formatAmount(r.total_shipping_cost)}</span> },
     { header: "Confidence", cell: (r: any) => <span className="text-xs text-muted-foreground">{r.delivery_confidence ? `${(r.delivery_confidence * 100).toFixed(0)}%` : "—"}</span> },
     { header: "ETA", cell: (r: any) => <span className="text-muted-foreground text-xs">{r.estimated_delivery ? new Date(r.estimated_delivery).toLocaleDateString() : "—"}</span> },
     { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
@@ -126,38 +127,27 @@ export default function Fulfillment() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass p-6 rounded-xl flex items-center gap-4 border-t-4 border-t-warning shadow-sm">
-          <div className="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-            <Clock className="w-6 h-6 text-warning" />
+        <div className="glass p-6 rounded-xl flex flex-col justify-center border-l-4 border-l-primary shadow-sm">
+          <p className="text-3xl font-bold text-foreground tracking-tight">{totalItems}</p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Total active fulfillments</p>
+        </div>
+        <div className="glass p-6 rounded-xl flex flex-col justify-center border-l-4 border-l-success shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <MapPin className="w-4 h-4 text-success" />
+            <span className="font-semibold text-slate-700">Total Shipping</span>
           </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground tracking-tight">
+          <p className="text-3xl font-bold text-success tracking-tight">{formatAmount(globalShippingCost)}</p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Across all shipments</p>
+        </div>
+        <div className="glass p-6 rounded-xl flex flex-col justify-center border-l-4 border-l-warning shadow-sm">
+           <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-warning" />
+            <span className="font-semibold text-slate-700">Processing</span>
+          </div>
+          <p className="text-3xl font-bold text-warning tracking-tight">
               {orders.filter((o) => ["processing", "pending"].includes(String(o.status))).length}
-            </p>
-            <p className="text-sm font-medium text-muted-foreground">Processing (this page)</p>
-          </div>
-        </div>
-        <div className="glass p-6 rounded-xl flex items-center gap-4 border-t-4 border-t-info shadow-sm">
-          <div className="w-12 h-12 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-            <Truck className="w-6 h-6 text-info" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground tracking-tight">
-              {orders.filter((o) => ["in_transit", "shipped"].includes(String(o.status))).length}
-            </p>
-            <p className="text-sm font-medium text-muted-foreground">In Transit (this page)</p>
-          </div>
-        </div>
-        <div className="glass p-6 rounded-xl flex items-center gap-4 border-t-4 border-t-success shadow-sm">
-          <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-6 h-6 text-success" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground tracking-tight">
-              {orders.filter((o) => ["delivered", "fulfilled"].includes(String(o.status))).length}
-            </p>
-            <p className="text-sm font-medium text-muted-foreground">Delivered (this page)</p>
-          </div>
+          </p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Pending action</p>
         </div>
       </div>
 
@@ -167,7 +157,11 @@ export default function Fulfillment() {
         ) : (
           <>
             <DataTable data={orders} columns={columns} onRowClick={(r) => setSelectedOrder(r)} isLoading={loading} />
-            <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+            <Pagination
+              currentPage={page}
+              totalPages={Math.ceil(totalItems / PAGE_SIZE)}
+              onPageChange={setPage}
+            />
           </>
         )}
       </div>
@@ -215,7 +209,7 @@ export default function Fulfillment() {
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b border-border/50">
                         <span className="text-muted-foreground">Shipping Cost</span>
-                        <span className="font-medium">{inr(selectedOrder.total_shipping_cost)}</span>
+                        <span className="font-medium">{formatAmount(selectedOrder.total_shipping_cost)}</span>
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b border-border/50">
                         <span className="text-muted-foreground">Transit ETA</span>

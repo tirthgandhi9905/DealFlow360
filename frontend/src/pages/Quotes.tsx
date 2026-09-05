@@ -4,15 +4,15 @@ import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
-import { Plus, Pencil, Eye } from "lucide-react"
+import { Plus, Pencil, Eye, Link } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function Quotes() {
+  const { formatAmount } = useCurrency()
   const [quotes, setQuotes] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -35,9 +35,9 @@ export default function Quotes() {
     { header: "Deal #", accessorKey: "deal_number" as const, className: "text-muted-foreground" },
     { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
     { header: "Version", cell: (r: any) => `v${r.version}` },
-    { header: "Subtotal", cell: (r: any) => <span className="text-muted-foreground">{inr(r.subtotal)}</span> },
-    { header: "Discount", cell: (r: any) => <span className="text-success">-{inr(r.total_discount)}</span> },
-    { header: "Grand Total", cell: (r: any) => <span className="font-semibold">{inr(r.grand_total)}</span> },
+    { header: "Subtotal", cell: (r: any) => <span className="text-muted-foreground">{formatAmount(r.subtotal)}</span> },
+    { header: "Discount", cell: (r: any) => <span className="text-success">-{formatAmount(r.total_discount)}</span> },
+    { header: "Grand Total", cell: (r: any) => <span className="font-semibold">{formatAmount(r.grand_total)}</span> },
     { header: "Created", cell: (r: any) => <span className="text-muted-foreground text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</span> },
     {
       header: "Actions",
@@ -56,6 +56,18 @@ export default function Quotes() {
             title="Edit (only while pending approval)"
           >
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              const link = `${window.location.origin}/portal/${r.id}`;
+              navigator.clipboard.writeText(link);
+              toast({ title: "Portal link copied to clipboard!" })
+            }}
+            className="p-1.5 rounded hover:bg-slate-100 text-muted-foreground hover:text-primary"
+            title="Copy Portal Link"
+          >
+            <Link className="w-4 h-4" />
           </button>
         </div>
       ),

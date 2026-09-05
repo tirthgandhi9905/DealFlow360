@@ -12,12 +12,32 @@ from app.models.user import User
 router = APIRouter()
 
 
+from datetime import datetime, timedelta
+
 @router.get("/")
 @router.get("/metrics")
 async def get_dashboard_metrics(
+    date_range: str = "ytd",
+    team: str = "all",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Set date bounds
+    now = datetime.utcnow()
+    if date_range == "last_30_days":
+        start_date = now - timedelta(days=30)
+    elif date_range == "this_quarter":
+        # Rough estimation of current quarter
+        curr_month = now.month
+        start_month = ((curr_month - 1) // 3) * 3 + 1
+        start_date = datetime(now.year, start_month, 1)
+    else:
+        # YTD
+        start_date = datetime(now.year, 1, 1)
+
+    # Base query filter
+    deal_filter = (Deal.created_at >= start_date)
+
     # Total revenue and cost across confirmed/fulfilled deals
     rev_res = await db.execute(
         select(
@@ -25,7 +45,7 @@ async def get_dashboard_metrics(
             func.sum(Deal.total_cost).label("total_cost"),
             func.avg(Deal.margin_percent).label("avg_margin"),
             func.count(Deal.id).label("total_deals"),
-        )
+        ).where(deal_filter)
     )
     rev_row = rev_res.first()
     total_rev = rev_row.total_revenue or 0.0
@@ -36,6 +56,7 @@ async def get_dashboard_metrics(
     # Deals by status breakdown
     status_res = await db.execute(
         select(Deal.status, func.count(Deal.id), func.sum(Deal.total_amount))
+        .where(deal_filter)
         .group_by(Deal.status)
     )
     status_breakdown = {}
@@ -52,7 +73,7 @@ async def get_dashboard_metrics(
             func.count(case((Deal.risk_score <= 30, 1))).label("low_risk"),
             func.count(case(((Deal.risk_score > 30) & (Deal.risk_score <= 70), 1))).label("med_risk"),
             func.count(case((Deal.risk_score > 70, 1))).label("high_risk"),
-        )
+        ).where(deal_filter)
     )
     risk_row = risk_res.first()
 

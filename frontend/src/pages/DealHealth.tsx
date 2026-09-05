@@ -4,14 +4,12 @@ import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { HeartPulse, AlertTriangle, TrendingDown, Activity, Percent, Bell } from "lucide-react"
-
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function DealHealth() {
+  const { formatAmount } = useCurrency()
   const [deals, setDeals] = useState<any[]>([])
   const [summary, setSummary] = useState<any>({})
   const [total, setTotal] = useState(0)
@@ -83,7 +81,7 @@ export default function DealHealth() {
         </div>
       ),
     },
-    { header: "Amount", cell: (r: any) => <span className="font-medium">{inr(r.total_amount)}</span> },
+    { header: "Amount", cell: (r: any) => <span className="font-medium">{formatAmount(r.total_amount)}</span> },
     { header: "Margin", cell: (r: any) => <span className={r.margin_percent >= 30 ? "text-success" : r.margin_percent >= 15 ? "text-warning" : "text-destructive"}>{r.margin_percent?.toFixed(1)}%</span> },
     {
       header: "Risk",

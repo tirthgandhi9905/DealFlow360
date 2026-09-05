@@ -2,10 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
 import api from "@/lib/api"
 import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X, Pencil, Lock, Zap } from "lucide-react"
-
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 interface Product {
   id: string
@@ -33,6 +30,7 @@ interface Line {
 }
 
 export default function QuoteBuilder() {
+  const { formatAmount } = useCurrency()
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -416,7 +414,7 @@ export default function QuoteBuilder() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 font-medium">{inr(finalPrice)}</td>
+                      <td className="px-4 py-4 font-medium">{formatAmount(finalPrice)}</td>
                       <td className="px-4 py-4">
                         {canEdit && (
                           <button onClick={() => removeLine(idx)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
@@ -448,7 +446,7 @@ export default function QuoteBuilder() {
                       >
                         <div>
                           <div className="font-medium">{p.name}</div>
-                          <div className="text-xs text-muted-foreground">{p.sku} · {inr(p.base_price)}</div>
+                          <div className="text-xs text-muted-foreground">{p.sku} · {formatAmount(p.base_price)}</div>
                         </div>
                         <span className="text-xs text-success">{p.margin_percent}% margin</span>
                       </button>
@@ -467,11 +465,11 @@ export default function QuoteBuilder() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>{inr(totals.subtotal)}</span>
+                <span>{formatAmount(totals.subtotal)}</span>
               </div>
               <div className="flex justify-between text-success">
                 <span>Discount</span>
-                <span>-{inr(totals.discount)}</span>
+                <span>-{formatAmount(totals.discount)}</span>
               </div>
               {canEdit && (
                 <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-border mt-2">
@@ -490,15 +488,15 @@ export default function QuoteBuilder() {
               <div className="h-px bg-border my-2"></div>
               <div className="flex justify-between font-bold text-lg text-foreground">
                 <span>Total</span>
-                <span>{inr(totals.net)}</span>
+                <span>{formatAmount(totals.net)}</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground pt-1">
                 <span>One-Time Products</span>
-                <span>{inr(totals.oneTimeTotal)}</span>
+                <span>{formatAmount(totals.oneTimeTotal)}</span>
               </div>
               <div className="flex justify-between text-xs text-primary font-medium pt-1">
                 <span>Recurring /mo</span>
-                <span>{inr(totals.recurringTotal)}</span>
+                <span>{formatAmount(totals.recurringTotal)}</span>
               </div>
             </div>
           </div>
@@ -554,7 +552,7 @@ export default function QuoteBuilder() {
                       <div key={s.product_id} className="p-3 rounded-lg border border-primary/20 bg-surface shadow-sm hover:border-primary/50 transition-colors">
                         <div className="flex justify-between items-start mb-1">
                           <span className="font-medium text-sm">{s.name}</span>
-                          <span className="text-sm font-semibold">{inr(s.base_price)}</span>
+                          <span className="text-sm font-semibold">{formatAmount(s.base_price)}</span>
                         </div>
                         {s.promotion_tag && (
                           <div className="text-[10px] uppercase font-medium text-primary mb-1">{s.promotion_tag}</div>

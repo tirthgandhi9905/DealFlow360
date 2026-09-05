@@ -5,13 +5,12 @@ import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { CreditCard, FileText, CheckCircle2, Clock, AlertTriangle, Printer, Download, X } from "lucide-react"
 
-function inr(n: number): string {
-  return `₹${(n || 0).toLocaleString("en-IN")}`
-}
+import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
 
 export default function Billing() {
+  const { formatAmount } = useCurrency()
   const [invoices, setInvoices] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -77,7 +76,7 @@ export default function Billing() {
     { header: "Invoice #", accessorKey: "invoice_number" as const, className: "font-medium text-foreground" },
     { header: "Deal", accessorKey: "deal_number" as const, className: "text-muted-foreground" },
     { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
-    { header: "Amount", cell: (r: any) => <span className={r.amount < 0 ? "text-destructive font-medium" : "font-medium"}>{inr(r.amount)}</span> },
+    { header: "Amount", cell: (r: any) => <span className={r.amount < 0 ? "text-destructive font-medium" : "font-medium"}>{formatAmount(r.amount)}</span> },
     { header: "Due Date", cell: (r: any) => <span className="text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : "—"}</span> },
     { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
     {
@@ -136,11 +135,11 @@ export default function Billing() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="glass p-6 rounded-xl border-l-4 border-l-primary shadow-sm">
           <p className="text-sm font-medium text-muted-foreground mb-2">Outstanding (this page)</p>
-          <p className="text-3xl font-bold text-foreground tracking-tight">{inr(totalOutstanding)}</p>
+          <p className="text-3xl font-bold text-foreground tracking-tight">{formatAmount(totalOutstanding)}</p>
         </div>
         <div className="glass p-6 rounded-xl border-l-4 border-l-success shadow-sm">
           <p className="text-sm font-medium text-muted-foreground mb-2">Collected (this page)</p>
-          <p className="text-3xl font-bold text-success tracking-tight">{inr(totalCollected)}</p>
+          <p className="text-3xl font-bold text-success tracking-tight">{formatAmount(totalCollected)}</p>
         </div>
         <div className="glass p-6 rounded-xl border-l-4 border-l-info shadow-sm">
           <p className="text-sm font-medium text-muted-foreground mb-2">Total invoices</p>
@@ -233,7 +232,7 @@ export default function Billing() {
                       </tr>
                       <tr>
                         <td className="py-1 pr-4 text-slate-500">Total Amount:</td>
-                        <td className="py-1 font-bold text-lg">{inr(selectedInvoice.amount)}</td>
+                        <td className="py-1 font-bold text-lg">{formatAmount(selectedInvoice.amount)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -258,8 +257,8 @@ export default function Billing() {
                         <p className="text-xs text-muted-foreground mt-1">SKU: ENT-LIC-001</p>
                       </td>
                       <td className="py-4 px-4 text-right">1</td>
-                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount * 0.8)}</td>
-                      <td className="py-4 px-4 text-right font-medium">{inr(selectedInvoice.amount * 0.8)}</td>
+                      <td className="py-4 px-4 text-right">{formatAmount(selectedInvoice.amount * 0.8)}</td>
+                      <td className="py-4 px-4 text-right font-medium">{formatAmount(selectedInvoice.amount * 0.8)}</td>
                     </tr>
                     <tr>
                       <td className="py-4 px-4">
@@ -267,22 +266,22 @@ export default function Billing() {
                         <p className="text-xs text-muted-foreground mt-1">One-time setup fee</p>
                       </td>
                       <td className="py-4 px-4 text-right">1</td>
-                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount * 0.2)}</td>
-                      <td className="py-4 px-4 text-right font-medium">{inr(selectedInvoice.amount * 0.2)}</td>
+                      <td className="py-4 px-4 text-right">{formatAmount(selectedInvoice.amount * 0.2)}</td>
+                      <td className="py-4 px-4 text-right font-medium">{formatAmount(selectedInvoice.amount * 0.2)}</td>
                     </tr>
                   </tbody>
                   <tfoot className="border-t-2 border-border">
                     <tr>
                       <td colSpan={3} className="py-4 px-4 text-right font-semibold">Subtotal:</td>
-                      <td className="py-4 px-4 text-right">{inr(selectedInvoice.amount)}</td>
+                      <td className="py-4 px-4 text-right">{formatAmount(selectedInvoice.amount)}</td>
                     </tr>
                     <tr>
                       <td colSpan={3} className="py-2 px-4 text-right text-slate-500">Tax (18% GST):</td>
-                      <td className="py-2 px-4 text-right text-slate-500">{inr(selectedInvoice.amount * 0.18)}</td>
+                      <td className="py-2 px-4 text-right text-slate-500">{formatAmount(selectedInvoice.amount * 0.18)}</td>
                     </tr>
                     <tr>
                       <td colSpan={3} className="py-4 px-4 text-right font-bold text-lg">Total:</td>
-                      <td className="py-4 px-4 text-right font-bold text-lg text-primary">{inr(selectedInvoice.amount * 1.18)}</td>
+                      <td className="py-4 px-4 text-right font-bold text-lg text-primary">{formatAmount(selectedInvoice.amount * 1.18)}</td>
                     </tr>
                   </tfoot>
                 </table>
