@@ -1,414 +1,427 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import api from "@/lib/api"
-import { ShoppingCart, Plus, Trash2, ArrowLeft, Zap, ShieldCheck, AlertTriangle, ArrowUpRight, CheckCircle2, Sparkles, Building, Package } from "lucide-react"
+import { Send, Plus, AlertCircle, CheckCircle2, TrendingUp, Sparkles, X } from "lucide-react"
+
+function inr(n: number): string {
+  return `₹${(n || 0).toLocaleString("en-IN")}`
+}
+
+interface Product {
+  id: string
+  name: string
+  sku: string
+  category: string
+  base_price: number
+  cost: number
+  margin_percent: number
+  is_subscription?: boolean
+}
+
+interface Customer {
+  id: string
+  name: string
+  tier: string
+  industry?: string
+}
+
+interface Line {
+  product: Product
+  quantity: number
+  unit_price: number
+  discount_percent: number
+}
 
 export default function QuoteBuilder() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const isNew = !id || id === "new"
 
-  const [customers, setCustomers] = useState<any[]>([])
-  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [savedResult, setSavedResult] = useState<any>(null)
+
+  const [products, setProducts] = useState<Product[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<string>("")
-  const [customerDetails, setCustomerDetails] = useState<any>(null)
-  const [lines, setLines] = useState<any[]>([])
-  const [notes, setNotes] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [lines, setLines] = useState<Line[]>([])
+  const [upsell, setUpsell] = useState<any>({ current_cart: {}, suggestions: [] })
+  const [showAddPicker, setShowAddPicker] = useState(false)
 
-  // Live Upsell & Telemetry
-  const [upsellData, setUpsellData] = useState<any>(null)
-  const [submissionResult, setSubmissionResult] = useState<any>(null)
-
-  // Load initial data
+  // Initial load: products + customers, and if viewing existing quote, load it too
   useEffect(() => {
-    const init = async () => {
-      setLoading(true)
+    const boot = async () => {
       try {
-        const [cRes, pRes] = await Promise.all([
-          api.get("/customers/?limit=100"),
-          api.get("/products/?limit=100"),
+        const [prodRes, custRes] = await Promise.all([
+          api.get("/products/", { params: { limit: 100, is_active: true } }),
+          api.get("/customers/", { params: { limit: 100 } }),
         ])
-        setCustomers(cRes.data.items || [])
-        setProducts(pRes.data.items || [])
+        const prodItems: Product[] = prodRes.data.items || []
+        const custItems: Customer[] = custRes.data.items || []
+        setProducts(prodItems)
+        setCustomers(custItems)
 
-        if (id && id !== "new") {
-          // Load existing quote
-          const qRes = await api.get(`/quotes/${id}`)
-          const quote = qRes.data
-          setSelectedCustomer(quote.customer_name ? (cRes.data.items.find((c: any) => c.name === quote.customer_name)?.id || "") : "")
-          if (quote.lines) {
-            setLines(
-              quote.lines.map((l: any) => ({
-                product_id: l.product_id,
+        if (!isNew && id) {
+          const q = await api.get(`/quotes/${id}`)
+          const data = q.data
+          setSelectedCustomer("")
+          const restoredLines: Line[] = (data.lines || [])
+            .map((l: any): Line | null => {
+              const prod = prodItems.find((p) => p.id === l.product_id)
+              if (!prod) return null
+              return {
+                product: prod,
                 quantity: l.quantity,
                 unit_price: l.unit_price,
                 discount_percent: l.discount_percent,
-              }))
-            )
+              }
+            })
+            .filter((x: Line | null): x is Line => x !== null)
+          setLines(restoredLines)
+        } else {
+          if (custItems[0]) setSelectedCustomer(custItems[0].id)
+          if (prodItems[0]) {
+            setLines([{ product: prodItems[0], quantity: 1, unit_price: prodItems[0].base_price, discount_percent: 0 }])
           }
-        } else if (cRes.data.items.length > 0) {
-          setSelectedCustomer(cRes.data.items[0].id)
         }
-      } catch (err) {
-        console.error("Failed to initialize QuoteBuilder", err)
+      } catch (e: any) {
+        setError(e?.response?.data?.detail || "Failed to load quote builder")
       } finally {
         setLoading(false)
       }
     }
-    init()
-  }, [id])
+    boot()
+  }, [id, isNew])
 
-  // Track customer selection
+  // Live upsell whenever lines change
   useEffect(() => {
-    if (selectedCustomer) {
-      const c = customers.find((cust) => cust.id === selectedCustomer)
-      setCustomerDetails(c || null)
+    if (lines.length === 0) {
+      setUpsell({ current_cart: {}, suggestions: [] })
+      return
     }
-  }, [selectedCustomer, customers])
-
-  // Live upsell calculation whenever cart changes
-  useEffect(() => {
-    const calculateUpsell = async () => {
-      if (lines.length === 0) {
-        setUpsellData(null)
-        return
-      }
+    const timeout = setTimeout(async () => {
       try {
         const payload = {
           customer_id: selectedCustomer || undefined,
           lines: lines.map((l) => ({
-            product_id: l.product_id,
+            product_id: l.product.id,
             quantity: l.quantity,
             unit_price: l.unit_price,
             discount_percent: l.discount_percent,
           })),
         }
-        const res = await api.post("/quotes/upsell-suggestions", payload)
-        setUpsellData(res.data)
-      } catch (err) {
-        console.error("Live upsell check failed", err)
+        const r = await api.post("/quotes/upsell-suggestions", payload)
+        setUpsell(r.data)
+      } catch {
+        /* silently keep last upsell */
       }
-    }
-    const timer = setTimeout(() => {
-      calculateUpsell()
-    }, 200)
-    return () => clearTimeout(timer)
+    }, 350)
+    return () => clearTimeout(timeout)
   }, [lines, selectedCustomer])
 
-  const addProductToCart = (prodId?: string) => {
-    const p = prodId ? products.find((prod) => prod.id === prodId) : products[0]
-    if (!p) return
-    setLines([
-      ...lines,
-      {
-        product_id: p.id,
-        quantity: 1,
-        unit_price: p.base_price,
-        discount_percent: 0,
-      },
-    ])
+  const updateLine = (index: number, field: keyof Line, value: any) => {
+    const next = [...lines]
+    ;(next[index] as any)[field] = value
+    setLines(next)
   }
 
-  const updateLine = (index: number, field: string, value: any) => {
-    const newLines = [...lines]
-    newLines[index][field] = value
-    if (field === "product_id") {
-      const p = products.find((prod) => prod.id === value)
-      if (p) newLines[index].unit_price = p.base_price
-    }
-    setLines(newLines)
+  const removeLine = (index: number) => setLines(lines.filter((_, i) => i !== index))
+
+  const addProduct = (prod: Product) => {
+    setLines([...lines, { product: prod, quantity: 1, unit_price: prod.base_price, discount_percent: 0 }])
+    setShowAddPicker(false)
   }
 
-  const removeLine = (index: number) => {
-    setLines(lines.filter((_, i) => i !== index))
-  }
+  const totals = useMemo(() => {
+    const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0)
+    const discount = lines.reduce((s, l) => s + l.quantity * l.unit_price * (l.discount_percent / 100), 0)
+    const net = subtotal - discount
+    const cost = lines.reduce((s, l) => s + l.product.cost * l.quantity, 0)
+    const margin = net > 0 ? ((net - cost) / net) * 100 : 0
+    return { subtotal, discount, net, margin }
+  }, [lines])
 
-  const handleCreateQuote = async () => {
-    if (!selectedCustomer) {
-      alert("Please select a customer account")
-      return
-    }
-    if (lines.length === 0) {
-      alert("Please add at least one line item to the quotation")
-      return
-    }
-
-    setSaving(true)
-    setSubmissionResult(null)
+  const submitQuote = async () => {
+    if (!selectedCustomer) return alert("Pick a customer first.")
+    if (lines.length === 0) return alert("Add at least one line item.")
+    setSubmitting(true)
+    setError("")
     try {
       const payload = {
         customer_id: selectedCustomer,
         lines: lines.map((l) => ({
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit_price: Number(l.unit_price),
-          discount_percent: Number(l.discount_percent),
+          product_id: l.product.id,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          discount_percent: l.discount_percent,
         })),
-        notes,
       }
-      const res = await api.post("/quotes/", payload)
-      setSubmissionResult(res.data)
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to create quotation")
+      const r = await api.post("/quotes/", payload)
+      setSavedResult(r.data)
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || "Failed to create quote")
     } finally {
-      setSaving(false)
+      setSubmitting(false)
     }
   }
 
-  if (loading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading quotation builder...</div>
-  }
+  if (loading) return <div className="p-8 text-center animate-pulse">Loading quote builder...</div>
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/quotes")} className="p-2 border border-border rounded-lg hover:bg-accent">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Interactive Quotation Builder</h2>
-            <p className="text-sm text-muted-foreground">Self-governing deal engine with live margin tracking and automated approval routing</p>
-          </div>
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-6 animate-in fade-in">
+      {/* Header */}
+      <div className="bg-surface border-b border-border p-6 flex justify-between items-center shrink-0">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">{isNew ? "New Quotation" : `Quotation ${id?.slice(0, 8)}`}</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isNew ? "Real-time risk routing + AI upsell" : "Read-only view"}
+          </p>
         </div>
-
-        <button
-          onClick={handleCreateQuote}
-          disabled={saving || lines.length === 0}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-bold rounded-lg hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
-        >
-          <Zap className="w-4 h-4" /> {saving ? "Dispatching..." : "Submit Quotation & Enforce Rules"}
-        </button>
+        <div className="flex items-center gap-3">
+          {isNew && (
+            <>
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-border bg-white text-sm min-w-[220px]"
+              >
+                <option value="">Select customer…</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({String(c.tier).toUpperCase()})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={submitQuote}
+                disabled={submitting || lines.length === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" /> {submitting ? "Submitting…" : "Create Quote & Deal"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Result Alert / Routing Status Banner */}
-      {submissionResult && (
-        <div className={`p-5 rounded-xl border ${
-          submissionResult.auto_approved ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300" : "bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300"
-        } space-y-2`}>
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-base flex items-center gap-2">
-              {submissionResult.auto_approved ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <AlertTriangle className="w-5 h-5 text-amber-500" />}
-              {submissionResult.auto_approved ? "Quotation Auto-Approved & Confirmed!" : `Quotation Routed for ${submissionResult.deal.required_approval_level.toUpperCase()} Approval`}
-            </span>
-            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-background">
-              Deal: {submissionResult.deal.deal_number} • Quote: {submissionResult.quote.quote_number}
-            </span>
-          </div>
-          <p className="text-sm">
-            Total Amount: <strong>₹{submissionResult.quote.grand_total.toLocaleString("en-IN")}</strong> • Margin: <strong>{submissionResult.deal.margin_percent}%</strong> • Blended Risk Score: <strong>{submissionResult.deal.risk_score}/100</strong>
-          </p>
-          <div className="pt-2 flex gap-3">
-            <button onClick={() => navigate("/quotes")} className="text-xs underline font-semibold">View Quotations List</button>
-            <button onClick={() => navigate("/approvals")} className="text-xs underline font-semibold">View Approvals Pipeline</button>
-          </div>
+      {error && (
+        <div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm text-center">
+          {error}
         </div>
       )}
 
-      {/* Main Grid: Builder on Left, Live Upsell & Telemetry on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Columns: Customer + Cart Lines */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Customer Selection Card */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
-            <h3 className="font-semibold text-base flex items-center gap-2">
-              <Building className="w-4 h-4 text-primary" /> Target Customer Account & Governance Tier
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">Select Customer</label>
-                <select
-                  value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none"
+      {savedResult && (
+        <div className="m-4 p-4 rounded-lg bg-success/10 border border-success/30 text-success text-sm">
+          <p className="font-semibold mb-1">✓ Quote {savedResult.quote?.quote_number} created for {savedResult.deal?.deal_number}</p>
+          <p className="text-xs">
+            Status: <span className="font-medium capitalize">{String(savedResult.deal?.status).replace(/_/g, " ")}</span>
+            {" · "}Risk: {savedResult.deal?.risk_score}/100
+            {" · "}{savedResult.auto_approved ? "Auto-approved" : `Routed to: ${savedResult.deal?.required_approval_level}`}
+          </p>
+          <button
+            onClick={() => navigate("/quotes")}
+            className="mt-2 text-xs underline"
+          >
+            → Go to Quotes list
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Line items */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="glass rounded-xl overflow-hidden">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-xs text-muted-foreground uppercase border-b border-border">
+                <tr>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3 w-24">Qty</th>
+                  <th className="px-4 py-3 w-32">Unit Price</th>
+                  <th className="px-4 py-3 w-32">Discount %</th>
+                  <th className="px-4 py-3 w-32">Final</th>
+                  <th className="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {lines.map((line, idx) => {
+                  const finalPrice = line.quantity * line.unit_price * (1 - line.discount_percent / 100)
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-foreground">{line.product.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5 capitalize">
+                          {String(line.product.category).replace(/_/g, " ")} · margin {line.product.margin_percent}%
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <input
+                          type="number" min="1"
+                          value={line.quantity}
+                          disabled={!isNew}
+                          onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value) || 1)}
+                          className="w-full bg-background border border-border rounded px-2 py-1 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={line.unit_price}
+                          disabled={!isNew}
+                          onChange={(e) => updateLine(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                          className="w-full bg-background border border-border rounded px-2 py-1 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="relative flex items-center">
+                          <input
+                            type="number" min="0" max="100"
+                            value={line.discount_percent}
+                            disabled={!isNew}
+                            onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
+                            className="w-full bg-background border border-border rounded px-2 py-1 pr-7 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
+                          />
+                          <span className="absolute right-2 text-muted-foreground">%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 font-medium">{inr(finalPrice)}</td>
+                      <td className="px-4 py-4">
+                        {isNew && (
+                          <button onClick={() => removeLine(idx)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {isNew && (
+              <div className="p-4 border-t border-border bg-slate-50 relative">
+                <button
+                  onClick={() => setShowAddPicker(!showAddPicker)}
+                  className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium"
                 >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.tier.toUpperCase()} Tier)
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="w-4 h-4" /> Add Line Item
+                </button>
+                {showAddPicker && (
+                  <div className="mt-3 max-h-64 overflow-y-auto border border-border rounded-lg bg-white">
+                    {products.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => addProduct(p)}
+                        className="w-full text-left px-4 py-2 border-b border-border last:border-b-0 hover:bg-slate-50 text-sm flex justify-between items-center"
+                      >
+                        <div>
+                          <div className="font-medium">{p.name}</div>
+                          <div className="text-xs text-muted-foreground">{p.sku} · {inr(p.base_price)}</div>
+                        </div>
+                        <span className="text-xs text-success">{p.margin_percent}% margin</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              {customerDetails && (
-                <div className="p-3 rounded-lg border border-border bg-accent/20 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Discount Ceiling:</span>
-                    <span className="font-bold text-foreground">
-                      {customerDetails.tier === "gold" ? "Up to 15%" : customerDetails.tier === "silver" ? "Up to 10%" : "Up to 5%"} Max Disc
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Account LTV:</span>
-                    <span className="font-semibold">₹{(customerDetails.lifetime_value || 0).toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="text-muted-foreground truncate">{customerDetails.address || customerDetails.email}</div>
-                </div>
-              )}
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-80 border-l border-border bg-surface flex flex-col overflow-y-auto shrink-0">
+          <div className="p-6 border-b border-border">
+            <h3 className="font-semibold text-foreground mb-4">Deal Summary</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{inr(totals.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-success">
+                <span>Discount</span>
+                <span>-{inr(totals.discount)}</span>
+              </div>
+              <div className="h-px bg-border my-2"></div>
+              <div className="flex justify-between font-bold text-lg text-foreground">
+                <span>Total</span>
+                <span>{inr(totals.net)}</span>
+              </div>
             </div>
           </div>
 
-          {/* Line Items Card */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
-            <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-primary" /> Quotation Line Items ({lines.length})
-              </h3>
-              <button
-                onClick={() => addProductToCart()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-semibold transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Product Line
-              </button>
+          <div className="p-6 border-b border-border">
+            <h3 className="font-semibold text-foreground mb-4">Live Health</h3>
+            <div className="mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Blended Margin</span>
+                <span className={totals.margin < 30 ? "text-destructive font-medium" : totals.margin < 40 ? "text-warning font-medium" : "text-success font-medium"}>
+                  {totals.margin.toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${totals.margin < 30 ? "bg-destructive" : totals.margin < 40 ? "bg-warning" : "bg-success"}`}
+                  style={{ width: `${Math.min(Math.max(totals.margin, 0), 100)}%` }}
+                />
+              </div>
             </div>
 
-            {lines.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl space-y-3">
-                <Package className="w-8 h-8 mx-auto text-muted-foreground/50" />
-                <p className="text-sm">No items in quotation cart yet.</p>
-                <button
-                  onClick={() => addProductToCart()}
-                  className="px-4 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90"
-                >
-                  Add First Product
-                </button>
+            {totals.margin < 20 && (
+              <div className="flex items-start gap-2 bg-destructive/10 text-destructive p-3 rounded-lg text-xs leading-relaxed">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                Very low margin — likely to require Finance approval.
               </div>
+            )}
+            {totals.margin >= 20 && totals.margin < 40 && (
+              <div className="flex items-start gap-2 bg-warning/10 text-warning p-3 rounded-lg text-xs leading-relaxed">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                Mid-tier margin — may need Sales Manager sign-off.
+              </div>
+            )}
+            {totals.margin >= 40 && (
+              <div className="flex items-center gap-2 bg-success/10 text-success p-3 rounded-lg text-xs font-medium">
+                <CheckCircle2 className="w-4 h-4" /> Healthy margin — auto-approval likely.
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 bg-gradient-to-b from-primary/5 to-transparent flex-1">
+            <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-primary" /> AI Upsell Suggestions
+            </h3>
+            {upsell.suggestions?.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Add items to see suggestions.</p>
             ) : (
               <div className="space-y-3">
-                {lines.map((line, idx) => {
-                  const currentProd = products.find((p) => p.id === line.product_id)
-                  const lineSubtotal = (line.unit_price || 0) * (line.quantity || 1)
-                  const lineNet = lineSubtotal * (1 - (line.discount_percent || 0) / 100)
-
+                {upsell.suggestions.slice(0, 4).map((s: any) => {
+                  const prod = products.find((p) => p.id === s.product_id)
                   return (
-                    <div key={idx} className="p-3.5 rounded-lg border border-border bg-accent/10 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                        <div className="sm:col-span-5">
-                          <label className="block text-[10px] font-semibold uppercase text-muted-foreground mb-1">Product</label>
-                          <select
-                            value={line.product_id}
-                            onChange={(e) => updateLine(idx, "product_id", e.target.value)}
-                            className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background"
+                    <div key={s.product_id} className="p-3 rounded-lg border border-primary/20 bg-surface shadow-sm hover:border-primary/50 transition-colors">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-medium text-sm">{s.name}</span>
+                        <span className="text-sm font-semibold">{inr(s.base_price)}</span>
+                      </div>
+                      {s.promotion_tag && (
+                        <div className="text-[10px] uppercase font-medium text-primary mb-1">{s.promotion_tag}</div>
+                      )}
+                      <div className="flex justify-between items-center mt-2">
+                        <span className={`text-xs flex items-center gap-1 ${s.margin_delta_if_added > 0 ? "text-success" : "text-muted-foreground"}`}>
+                          <TrendingUp className="w-3 h-3" />
+                          {s.margin_delta_if_added > 0 ? "+" : ""}{s.margin_delta_if_added}% margin
+                        </span>
+                        {prod && isNew && (
+                          <button
+                            onClick={() => addProduct(prod)}
+                            className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors"
                           >
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} (₹{p.base_price.toLocaleString("en-IN")})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-semibold uppercase text-muted-foreground mb-1">Qty</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={line.quantity}
-                            onChange={(e) => updateLine(idx, "quantity", Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-semibold uppercase text-muted-foreground mb-1">Disc %</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.5"
-                            value={line.discount_percent}
-                            onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
-                            className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background font-semibold"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2 text-right">
-                          <label className="block text-[10px] font-semibold uppercase text-muted-foreground mb-1">Line Total</label>
-                          <span className="font-bold text-xs">₹{lineNet.toLocaleString("en-IN")}</span>
-                        </div>
-
-                        <div className="sm:col-span-1 text-right">
-                          <button onClick={() => removeLine(idx)} className="text-rose-500 hover:text-rose-700 p-1">
-                            <Trash2 className="w-4 h-4" />
+                            Add
                           </button>
-                        </div>
+                        )}
                       </div>
                     </div>
                   )
                 })}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right 1 Column: Live Margin Telemetry & Upsell Panel */}
-        <div className="space-y-6">
-          {/* Live Margin Indicator */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
-            <h3 className="font-semibold text-base flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-primary" /> Real-Time Margin & Pricing Indicator
-            </h3>
-            {upsellData ? (
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-1 border-b border-border">
-                  <span className="text-muted-foreground">Order Revenue:</span>
-                  <span className="font-bold">₹{upsellData.current_cart.total_revenue.toLocaleString("en-IN")}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-border">
-                  <span className="text-muted-foreground">Order Cost:</span>
-                  <span className="text-muted-foreground">₹{upsellData.current_cart.total_cost.toLocaleString("en-IN")}</span>
-                </div>
-                <div className="flex justify-between py-2 bg-emerald-500/10 px-3 rounded-lg border border-emerald-500/20">
-                  <span className="font-bold text-emerald-800 dark:text-emerald-300">Live Margin:</span>
-                  <span className="font-extrabold text-emerald-800 dark:text-emerald-300 text-base">
-                    {upsellData.current_cart.current_margin_percent}%
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Add products to calculate live order margin.</p>
-            )}
-          </div>
-
-          {/* Live Upsell & Cross-Sell Panel */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" /> Live Upsell Suggestions
-              </h3>
-              <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded">Margin Boost</span>
-            </div>
-
-            {upsellData?.suggestions?.length > 0 ? (
-              <div className="space-y-3">
-                {upsellData.suggestions.map((sug: any) => (
-                  <div key={sug.product_id} className="p-3 rounded-lg border border-border bg-accent/20 space-y-2 hover:border-primary/40 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-xs">{sug.name}</h4>
-                        <span className="text-[10px] text-muted-foreground uppercase">{sug.category} • ₹{sug.base_price.toLocaleString("en-IN")}</span>
-                      </div>
-                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-0.5">
-                        <ArrowUpRight className="w-3.5 h-3.5" /> +{sug.margin_delta_if_added}% Margin
-                      </span>
-                    </div>
-                    {sug.promotion_tag && (
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
-                        {sug.promotion_tag}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => addProductToCart(sug.product_id)}
-                      className="w-full py-1.5 mt-1 bg-primary text-primary-foreground text-xs font-semibold rounded-md hover:opacity-90 transition-opacity flex items-center justify-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add to Quote
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Add items to view automated cross-sell recommendations.</p>
             )}
           </div>
         </div>

@@ -1,23 +1,23 @@
-import React, { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import api from "@/lib/api"
 
-export interface User {
+interface User {
   id: string
   email: string
   name: string
   role: string
 }
 
-interface AuthContextType {
+interface AuthContextValue {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextValue | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -27,19 +27,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
       return
     }
-
     api
       .get("/auth/me")
-      .then((r) => {
-        setUser(r.data)
-      })
+      .then((r) => setUser(r.data))
       .catch(() => {
         localStorage.removeItem("token")
         setUser(null)
       })
-      .finally(() => {
-        setLoading(false)
-      })
+      .finally(() => setLoading(false))
   }, [])
 
   const login = async (email: string, password: string) => {
@@ -60,10 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
+  return ctx
 }

@@ -1,128 +1,130 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
-import { Lock, Mail, ShieldCheck, ArrowRight, Sparkles } from "lucide-react"
 
 export default function Login() {
   const { login } = useAuth()
-  const [email, setEmail] = useState("prince@gs.in")
-  const [password, setPassword] = useState("1234")
+  const navigate = useNavigate()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setLoading(true)
+    setSubmitting(true)
     try {
       await login(email, password)
+      navigate("/", { replace: true })
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Invalid email or password")
+      const detail = err?.response?.data?.detail
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "Invalid credentials. Please try again."
+      )
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
-  const handleQuickLogin = (demoEmail: string) => {
+  const fillDemo = (demoEmail: string) => {
     setEmail(demoEmail)
     setPassword("1234")
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-4">
-      <div className="w-full max-w-md p-8 rounded-2xl border border-border bg-card shadow-xl space-y-6">
-        <div className="text-center space-y-1.5">
-          <div className="inline-flex p-3 rounded-2xl bg-primary/10 text-primary mb-2">
-            <ShieldCheck className="w-8 h-8" />
+    <div className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
+      {/* Background ambient light */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-primary/5 blur-[120px] rounded-full -z-10" />
+      <div className="absolute bottom-0 right-0 w-[600px] h-[400px] bg-secondary/5 blur-[100px] rounded-full -z-10" />
+
+      <div className="w-full max-w-md p-8 glass rounded-2xl animate-in fade-in zoom-in duration-500">
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 mx-auto mb-4">
+            <span className="text-white font-bold text-2xl leading-none">D</span>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">DealFlow360</h1>
-          <p className="text-xs text-muted-foreground">Self-Governing Sales Operations & Deal Digital Twin</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">DealFlow360</h1>
+          <p className="text-sm text-muted-foreground">Sign in to your sales workspace</p>
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center">
+          <div className="mb-6 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-              <input
-                type="email"
-                required
-                placeholder="name@dealflow.in"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground ml-1">Email address</label>
+            <input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground transition-all shadow-sm"
+              required
+              autoFocus
+            />
           </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-sm font-medium text-muted-foreground">Password</label>
             </div>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground transition-all shadow-sm"
+              required
+            />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={submitting}
+            className="w-full py-2.5 mt-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? "Signing in..." : "Sign In to Workspace"} <ArrowRight className="w-4 h-4" />
+            {submitting ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
-        {/* Quick Demo Login Credentials Picker */}
-        <div className="pt-3 border-t border-border space-y-2">
-          <span className="text-[11px] font-bold uppercase text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-500" /> Demo Quick Select (Password: 1234)
-          </span>
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("prince@gs.in")}
-              className="p-2 rounded-md border border-border hover:bg-accent text-left transition-colors"
-            >
-              <strong className="block text-foreground">Prince (Admin)</strong>
-              <span className="text-[10px] text-muted-foreground">prince@gs.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("ravi@dealflow.in")}
-              className="p-2 rounded-md border border-border hover:bg-accent text-left transition-colors"
-            >
-              <strong className="block text-foreground">Ravi (Sales Rep)</strong>
-              <span className="text-[10px] text-muted-foreground">ravi@dealflow.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("vikram@dealflow.in")}
-              className="p-2 rounded-md border border-border hover:bg-accent text-left transition-colors"
-            >
-              <strong className="block text-foreground">Vikram (Manager)</strong>
-              <span className="text-[10px] text-muted-foreground">vikram@dealflow.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin("deepak@dealflow.in")}
-              className="p-2 rounded-md border border-border hover:bg-accent text-left transition-colors"
-            >
-              <strong className="block text-foreground">Deepak (Finance)</strong>
-              <span className="text-[10px] text-muted-foreground">deepak@dealflow.in</span>
-            </button>
-          </div>
+        <div className="mt-6 flex items-center gap-4">
+          <div className="h-px bg-border/50 flex-1"></div>
+          <span className="text-xs text-muted-foreground font-medium uppercase">Demo accounts</span>
+          <div className="h-px bg-border/50 flex-1"></div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => fillDemo("hemil@gs.in")}
+            className="text-left px-3 py-2 rounded-lg border border-border bg-white hover:bg-slate-50 transition-colors"
+          >
+            <span className="font-medium text-foreground">Admin</span>
+            <span className="text-muted-foreground"> · hemil@gs.in</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fillDemo("vikram@dealflow.in")}
+            className="text-left px-3 py-2 rounded-lg border border-border bg-white hover:bg-slate-50 transition-colors"
+          >
+            <span className="font-medium text-foreground">Sales Manager</span>
+            <span className="text-muted-foreground"> · vikram@dealflow.in</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fillDemo("ravi@dealflow.in")}
+            className="text-left px-3 py-2 rounded-lg border border-border bg-white hover:bg-slate-50 transition-colors"
+          >
+            <span className="font-medium text-foreground">Sales Rep</span>
+            <span className="text-muted-foreground"> · ravi@dealflow.in</span>
+          </button>
+          <p className="text-center text-muted-foreground mt-1">
+            Password for all demo accounts: <span className="font-mono font-medium text-foreground">1234</span>
+          </p>
         </div>
       </div>
     </div>

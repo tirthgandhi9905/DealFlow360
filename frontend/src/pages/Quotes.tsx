@@ -1,125 +1,62 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "@/lib/api"
-import { FileText, Plus, Search, Filter, ArrowRight, Eye, CheckCircle2, Clock, AlertCircle } from "lucide-react"
+import { DataTable } from "@/components/ui/DataTable"
+import { Plus } from "lucide-react"
+
+function inr(n: number): string {
+  return `₹${(n || 0).toLocaleString("en-IN")}`
+}
 
 export default function Quotes() {
   const [quotes, setQuotes] = useState<any[]>([])
-  const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const navigate = useNavigate()
 
-  const fetchQuotes = async () => {
-    setLoading(true)
-    try {
-      const params: any = { limit: 50 }
-      if (search) params.search = search
-      const res = await api.get("/quotes/", { params })
-      setQuotes(res.data.items || [])
-      setTotal(res.data.total || 0)
-    } catch (err) {
-      console.error("Failed to load quotes", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    fetchQuotes()
-  }, [search])
+    api
+      .get("/quotes/")
+      .then((r) => setQuotes(r.data.items || []))
+      .catch((e) => setError(e?.response?.data?.detail || "Failed to load quotes"))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const columns = [
+    { header: "Quote #", accessorKey: "quote_number" as const, className: "font-medium text-foreground" },
+    { header: "Deal #", accessorKey: "deal_number" as const, className: "text-muted-foreground" },
+    { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
+    { header: "Version", cell: (r: any) => `v${r.version}` },
+    { header: "Subtotal", cell: (r: any) => <span className="text-muted-foreground">{inr(r.subtotal)}</span> },
+    { header: "Discount", cell: (r: any) => <span className="text-success">-{inr(r.total_discount)}</span> },
+    { header: "Grand Total", cell: (r: any) => <span className="font-semibold">{inr(r.grand_total)}</span> },
+    { header: "Created", cell: (r: any) => <span className="text-muted-foreground">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</span> },
+  ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Quotations & Deals Pipeline</h2>
-          <p className="text-sm text-muted-foreground">Manage multi-line B2B quotes, deal revisions, and approval dispatch states</p>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">Quotations</h2>
+          <p className="text-sm text-muted-foreground mt-1">All quotes generated across deals</p>
         </div>
         <button
           onClick={() => navigate("/quotes/new")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity shadow-sm"
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-primary/25"
         >
-          <Plus className="w-4 h-4" /> Create New Quotation
+          <Plus className="w-4 h-4" />
+          Create Quote
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search by quote number (e.g. QT-1001)..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-        />
-      </div>
-
-      {/* Quotes Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-border flex justify-between items-center bg-accent/20">
-          <span className="font-semibold text-sm">Showing {quotes.length} of {total} Quotations</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs uppercase bg-accent/40 text-muted-foreground border-b border-border">
-              <tr>
-                <th className="px-4 py-3">Quote Number</th>
-                <th className="px-4 py-3">Deal Number</th>
-                <th className="px-4 py-3">Customer Name</th>
-                <th className="px-4 py-3">Version</th>
-                <th className="px-4 py-3">Subtotal</th>
-                <th className="px-4 py-3">Total Discount</th>
-                <th className="px-4 py-3">Grand Total (incl. GST)</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground animate-pulse">
-                    Loading quotations...
-                  </td>
-                </tr>
-              ) : quotes.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                    No quotations found.
-                  </td>
-                </tr>
-              ) : (
-                quotes.map((q) => (
-                  <tr key={q.id} className="hover:bg-accent/20 transition-colors">
-                    <td className="px-4 py-3.5 font-bold text-foreground flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-primary" /> {q.quote_number}
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-muted-foreground">{q.deal_number}</td>
-                    <td className="px-4 py-3.5 font-medium">{q.customer_name}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-accent">v{q.version}</span>
-                    </td>
-                    <td className="px-4 py-3.5 text-muted-foreground">₹{q.subtotal.toLocaleString("en-IN")}</td>
-                    <td className="px-4 py-3.5 text-rose-600 dark:text-rose-400 font-semibold">
-                      -₹{q.total_discount.toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-4 py-3.5 font-bold text-foreground">
-                      ₹{q.grand_total.toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button
-                        onClick={() => navigate(`/quotes/${q.id}`)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                      >
-                        View & Edit <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="glass rounded-xl p-4">
+        {loading ? (
+          <div className="text-center p-8 text-muted-foreground animate-pulse">Loading quotations...</div>
+        ) : error ? (
+          <div className="text-center p-8 text-destructive">{error}</div>
+        ) : (
+          <DataTable data={quotes} columns={columns} />
+        )}
       </div>
     </div>
   )
