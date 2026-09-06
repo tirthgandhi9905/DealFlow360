@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
+import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { useCurrency } from "@/context/CurrencyContext"
 
@@ -21,6 +22,7 @@ export default function Approvals() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [filter, setFilter] = useState<string>("pending")
+  const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const navigate = useNavigate()
 
@@ -28,12 +30,31 @@ export default function Approvals() {
     setLoading(true)
     const params: any = { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
     if (filter) params.status = filter
+    if (search) params.search = search
     api
       .get("/approvals/", { params })
-      .then((r) => { setApprovals(r.data.items || []); setTotal(r.data.total || 0) })
+      .then((r) => {
+        let items = r.data.items || []
+        let tot = r.data.total || 0
+        if (search) {
+          const q = search.toLowerCase()
+          const matches = items.filter((item: any) =>
+            item.deal_number?.toLowerCase().includes(q) ||
+            item.customer_name?.toLowerCase().includes(q) ||
+            item.sales_rep_name?.toLowerCase().includes(q) ||
+            item.customer_tier?.toLowerCase().includes(q)
+          )
+          if (items.length > matches.length) {
+            items = matches
+            tot = matches.length
+          }
+        }
+        setApprovals(items)
+        setTotal(tot)
+      })
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load approvals"))
       .finally(() => setLoading(false))
-  }, [filter, page])
+  }, [filter, page, search])
 
   const columns = [
     { header: "Deal #", accessorKey: "deal_number" as const, className: "font-medium text-foreground" },
@@ -61,16 +82,23 @@ export default function Approvals() {
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Approvals Queue</h2>
           <p className="text-sm text-muted-foreground mt-1">Review deals requiring authorization</p>
         </div>
-        <div className="flex gap-2 text-sm">
-          {["pending", "approved", "rejected", ""].map((f) => (
-            <button
-              key={f || "all"}
-              onClick={() => { setFilter(f); setPage(1) }}
-              className={`px-3 py-1.5 rounded-lg transition-colors capitalize ${filter === f ? "bg-primary text-primary-foreground" : "bg-white border border-border text-muted-foreground hover:bg-slate-50"}`}
-            >
-              {f || "All"}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          <SearchBox
+            value={search}
+            onChange={(v) => { setSearch(v); setPage(1) }}
+            placeholder="Search deal #, customer, rep..."
+          />
+          <div className="flex gap-2 text-sm">
+            {["pending", "approved", "rejected", ""].map((f) => (
+              <button
+                key={f || "all"}
+                onClick={() => { setFilter(f); setPage(1) }}
+                className={`px-3 py-1.5 rounded-lg transition-colors capitalize ${filter === f ? "bg-primary text-primary-foreground" : "bg-white border border-border text-muted-foreground hover:bg-slate-50"}`}
+              >
+                {f || "All"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

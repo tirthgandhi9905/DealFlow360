@@ -13,7 +13,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: 'https://few-hats-sell.loca.lt',
         changeOrigin: true,
         secure: false,
         headers: {

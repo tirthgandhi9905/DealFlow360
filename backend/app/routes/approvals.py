@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from pydantic import BaseModel
 from app.database import get_db
 from app.models.approval import Approval, ApprovalStep, ApprovalStatus
@@ -24,6 +24,7 @@ class ApprovalActionRequest(BaseModel):
 async def list_approvals(
     status: Optional[ApprovalStatus] = Query(None, description="Filter by approval status"),
     required_level: Optional[str] = Query(None, description="Filter by required level"),
+    search: Optional[str] = Query(None, description="Search by deal number, customer name, or sales rep"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -49,6 +50,15 @@ async def list_approvals(
         query = query.where(Approval.status == status)
     if required_level:
         query = query.where(Approval.required_level == required_level)
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                Deal.deal_number.ilike(search_pattern),
+                Customer.name.ilike(search_pattern),
+                User.name.ilike(search_pattern),
+            )
+        )
 
     total_res = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_res.scalar() or 0
