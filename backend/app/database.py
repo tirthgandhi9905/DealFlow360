@@ -31,3 +31,7 @@ async def init_db():
             await conn.execute(text("ALTER TABLE products ADD COLUMN stock_count INTEGER DEFAULT 100;"))
         except Exception:
             pass
+        try:
+            await conn.execute(text("ALTER TABLE products ADD COLUMN category_discount_ceiling FLOAT DEFAULT 10.0;"))
+        except Exception:
+            pass
