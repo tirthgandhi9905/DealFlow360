@@ -22,6 +22,12 @@ async def get_db() -> AsyncSession:
             await session.close()
 
 
+from sqlalchemy import text
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.execute(text("ALTER TABLE products ADD COLUMN stock_count INTEGER DEFAULT 100;"))
+        except Exception:
+            pass
