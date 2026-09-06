@@ -59,14 +59,15 @@ export default function Subscriptions() {
   }
 
   const columns = [
-    { header: "Contract #", accessorKey: "deal_number" as const, className: "font-medium text-primary" },
-    { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
-    { header: "Cycle", cell: (r: any) => <span className="capitalize text-muted-foreground">{r.cycle}</span> },
-    { header: "Recurring", cell: (r: any) => <span className="font-semibold text-foreground">{formatAmount(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
-    { header: "Next Bill Date", cell: (r: any) => <span className="text-slate-600 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> {r.next_billing_date ? new Date(r.next_billing_date).toLocaleDateString() : "—"}</span> },
-    { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
+    { header: "Contract #", accessorKey: "deal_number" as const, sortable: true, className: "font-medium text-primary" },
+    { header: "Customer", accessorKey: "customer_name" as const, sortable: true, className: "font-medium" },
+    { header: "Cycle", accessorKey: "cycle" as const, sortable: true, cell: (r: any) => <span className="capitalize text-muted-foreground">{r.cycle}</span> },
+    { header: "Recurring", accessorKey: "recurring_total" as const, sortable: true, cell: (r: any) => <span className="font-semibold text-foreground">{formatAmount(r.recurring_total)}<span className="text-xs text-muted-foreground font-normal">/{r.cycle === 'monthly' ? 'mo' : 'qtr'}</span></span> },
+    { header: "Next Bill Date", accessorKey: "next_billing_date" as const, sortable: true, cell: (r: any) => <span className="text-slate-600 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" /> {r.next_billing_date ? new Date(r.next_billing_date).toLocaleDateString() : "—"}</span> },
+    { header: "Status", accessorKey: "status" as const, sortable: true, cell: (r: any) => getStatusBadge(r.status) },
     {
       header: "Action",
+      sortable: false,
       cell: (r: any) => (
         <button
           onClick={() => setSelectedSub(r)}

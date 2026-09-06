@@ -25,6 +25,8 @@ async def list_approvals(
     status: Optional[ApprovalStatus] = Query(None, description="Filter by approval status"),
     required_level: Optional[str] = Query(None, description="Filter by required level"),
     search: Optional[str] = Query(None, description="Search by deal number, customer name, or sales rep"),
+    min_amount: Optional[float] = Query(None, description="Minimum deal amount"),
+    max_amount: Optional[float] = Query(None, description="Maximum deal amount"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -59,6 +61,10 @@ async def list_approvals(
                 User.name.ilike(search_pattern),
             )
         )
+    if min_amount is not None:
+        query = query.where(Deal.total_amount >= min_amount)
+    if max_amount is not None:
+        query = query.where(Deal.total_amount <= max_amount)
 
     total_res = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_res.scalar() or 0

@@ -74,6 +74,8 @@ export default function DealHealth() {
   const columns = [
     {
       header: "Deal",
+      accessorKey: "customer_name" as const,
+      sortable: true,
       cell: (r: any) => (
         <div>
           <div className="font-medium text-foreground">{r.customer_name}</div>
@@ -81,10 +83,12 @@ export default function DealHealth() {
         </div>
       ),
     },
-    { header: "Amount", cell: (r: any) => <span className="font-medium">{formatAmount(r.total_amount)}</span> },
-    { header: "Margin", cell: (r: any) => <span className={r.margin_percent >= 30 ? "text-success" : r.margin_percent >= 15 ? "text-warning" : "text-destructive"}>{r.margin_percent?.toFixed(1)}%</span> },
+    { header: "Amount", accessorKey: "total_amount" as const, sortable: true, cell: (r: any) => <span className="font-medium">{formatAmount(r.total_amount)}</span> },
+    { header: "Margin", accessorKey: "margin_percent" as const, sortable: true, cell: (r: any) => <span className={r.margin_percent >= 30 ? "text-success" : r.margin_percent >= 15 ? "text-warning" : "text-destructive"}>{r.margin_percent?.toFixed(1)}%</span> },
     {
       header: "Risk",
+      accessorKey: "risk_score" as const,
+      sortable: true,
       cell: (r: any) => (
         <div className="flex items-center gap-2">
           <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -99,9 +103,10 @@ export default function DealHealth() {
         </div>
       ),
     },
-    { header: "Idle Days", cell: (r: any) => <span className={r.is_stalled ? "text-destructive font-medium" : "text-muted-foreground"}>{r.idle_days}</span> },
+    { header: "Idle Days", accessorKey: "idle_days" as const, sortable: true, cell: (r: any) => <span className={r.is_stalled ? "text-destructive font-medium" : "text-muted-foreground"}>{r.idle_days}</span> },
     {
       header: "Signal",
+      sortable: false,
       cell: (r: any) => (
         <div className="flex items-center gap-1.5 text-xs font-medium">
           {r.is_anomaly ? (
@@ -116,6 +121,7 @@ export default function DealHealth() {
     },
     {
       header: "Actions",
+      sortable: false,
       cell: (r: any) => (
         <div className="flex gap-2">
           <button

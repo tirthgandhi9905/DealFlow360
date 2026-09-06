@@ -28,10 +28,7 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         try:
-            await conn.execute(text("ALTER TABLE products ADD COLUMN stock_count INTEGER DEFAULT 100;"))
-        except Exception:
-            pass
-        try:
-            await conn.execute(text("ALTER TABLE products ADD COLUMN category_discount_ceiling FLOAT DEFAULT 10.0;"))
+            await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_count INTEGER DEFAULT 100;"))
+            await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_discount_ceiling FLOAT DEFAULT 10.0;"))
         except Exception:
             pass

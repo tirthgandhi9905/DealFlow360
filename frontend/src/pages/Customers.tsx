@@ -55,15 +55,15 @@ export default function Customers() {
   }
 
   const columns = [
-    { header: "Name", accessorKey: "name" as const, className: "font-medium text-foreground" },
-    { header: "Email", accessorKey: "email" as const, className: "text-muted-foreground" },
-    { header: "Industry", cell: (r: any) => <span className="text-muted-foreground">{r.industry || "—"}</span> },
-    { header: "Tier", cell: (r: any) => {
+    { header: "Name", accessorKey: "name" as const, sortable: true, className: "font-medium text-foreground" },
+    { header: "Email", accessorKey: "email" as const, sortable: true, className: "text-muted-foreground" },
+    { header: "Industry", accessorKey: "industry" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground">{r.industry || "—"}</span> },
+    { header: "Tier", accessorKey: "tier" as const, sortable: true, cell: (r: any) => {
       const tier = String(r.tier || "").toLowerCase()
       return <span className={`text-xs font-medium px-2 py-0.5 rounded ${TIER_STYLES[tier] || "bg-slate-100 text-slate-600"}`}>{tier.toUpperCase() || "—"}</span>
     }},
-    { header: "Lifetime Value", cell: (r: any) => <span className="font-medium">{formatAmount(r.lifetime_value || 0)}</span> },
-    { header: "Phone", cell: (r: any) => <span className="text-muted-foreground">{r.phone || "—"}</span> },
+    { header: "Lifetime Value", accessorKey: "lifetime_value" as const, sortable: true, cell: (r: any) => <span className="font-medium">{formatAmount(r.lifetime_value || 0)}</span> },
+    { header: "Phone", accessorKey: "phone" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground">{r.phone || "—"}</span> },
   ]
 
   return (

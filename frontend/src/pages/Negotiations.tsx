@@ -102,6 +102,8 @@ export default function Negotiations() {
   const columns = [
     {
       header: "Deal",
+      accessorKey: "customer_name" as const,
+      sortable: true,
       cell: (r: any) => (
         <div>
           <div className="font-medium text-foreground">{r.customer_name}</div>
@@ -109,12 +111,13 @@ export default function Negotiations() {
         </div>
       ),
     },
-    { header: "Tier", cell: (r: any) => <span className="text-xs uppercase text-muted-foreground">{r.customer_tier}</span> },
-    { header: "Round", cell: (r: any) => <span className="font-medium">#{r.round_count}</span> },
-    { header: "Deal Amount", cell: (r: any) => <span className="font-medium">{formatAmount(r.deal_amount)}</span> },
-    { header: "Margin", cell: (r: any) => <span className={r.deal_margin >= 30 ? "text-success" : "text-warning"}>{r.deal_margin?.toFixed(1)}%</span> },
+    { header: "Tier", accessorKey: "customer_tier" as const, sortable: true, cell: (r: any) => <span className="text-xs uppercase text-muted-foreground">{r.customer_tier}</span> },
+    { header: "Round", accessorKey: "round_count" as const, sortable: true, cell: (r: any) => <span className="font-medium">#{r.round_count}</span> },
+    { header: "Deal Amount", accessorKey: "deal_amount" as const, sortable: true, cell: (r: any) => <span className="font-medium">{formatAmount(r.deal_amount)}</span> },
+    { header: "Margin", accessorKey: "deal_margin" as const, sortable: true, cell: (r: any) => <span className={r.deal_margin >= 30 ? "text-success" : "text-warning"}>{r.deal_margin?.toFixed(1)}%</span> },
     {
       header: "Concession Budget",
+      sortable: false,
       cell: (r: any) => (
         <div className="text-xs">
           <div className="text-muted-foreground">Used: {formatAmount(r.concession_budget?.used || 0)}</div>
@@ -124,6 +127,8 @@ export default function Negotiations() {
     },
     {
       header: "Status",
+      accessorKey: "status" as const,
+      sortable: true,
       cell: (r: any) => (
         <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.status === "open" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
           {r.status}
@@ -132,6 +137,7 @@ export default function Negotiations() {
     },
     {
       header: "Portal",
+      sortable: false,
       cell: (r: any) => (
         <button
           onClick={() => openPortal(r.deal_id)}

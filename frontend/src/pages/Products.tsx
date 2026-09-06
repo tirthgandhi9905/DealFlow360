@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"
-import { Box, Settings2, PackagePlus, Tags, Settings, Plus, Trash2 } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { Box, Settings2, PackagePlus, Tags, Settings, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
@@ -18,6 +18,8 @@ export default function Products() {
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  const [sortKey, setSortKey] = useState<string>("name")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [isNew, setIsNew] = useState(false)
@@ -34,6 +36,47 @@ export default function Products() {
   useEffect(() => {
     load()
   }, [page, search])
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedProducts = useMemo(() => {
+    if (!sortKey) return products
+    return [...products].sort((a, b) => {
+      let valA: any = a[sortKey]
+      let valB: any = b[sortKey]
+
+      if (sortKey === "type") {
+        valA = a.is_subscription ? 1 : 0
+        valB = b.is_subscription ? 1 : 0
+      } else if (sortKey === "max_discount") {
+        const disc = (cat: string) => cat === 'hardware' ? 10 : cat === 'software' ? 25 : 15
+        valA = a.category_discount_ceiling ?? disc(a.category)
+        valB = b.category_discount_ceiling ?? disc(b.category)
+      } else if (sortKey === "stock_count") {
+        valA = a.stock_count ?? 0
+        valB = b.stock_count ?? 0
+      }
+
+      if (valA === undefined || valA === null) valA = ""
+      if (valB === undefined || valB === null) valB = ""
+
+      let comparison = 0
+      if (typeof valA === "number" && typeof valB === "number") {
+        comparison = valA - valB
+      } else {
+        comparison = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" })
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison
+    })
+  }, [products, sortKey, sortDirection])
 
   const handleSave = async () => {
     try {
@@ -62,17 +105,18 @@ export default function Products() {
   }
 
   const columns = [
-    { header: "SKU", accessorKey: "sku" as const, className: "font-mono text-xs text-muted-foreground" },
-    { header: "Name", accessorKey: "name" as const, className: "font-medium" },
-    { header: "Category", cell: (r: any) => <span className="text-muted-foreground capitalize">{String(r.category).replace(/_/g, " ")}</span> },
-    { header: "Base Price", cell: (r: any) => <span className="font-medium">{formatAmount(r.base_price)}</span> },
-    { header: "Cost", cell: (r: any) => <span className="text-muted-foreground">{formatAmount(r.cost)}</span> },
-    { header: "Margin", cell: (r: any) => <span className={r.margin_percent >= 40 ? "text-success" : r.margin_percent >= 25 ? "text-warning" : "text-destructive"}>{r.margin_percent}%</span> },
-    { header: "Type", cell: (r: any) => r.is_subscription ? <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Subscription · {r.recurring_interval || "monthly"}</span> : <span className="text-xs text-muted-foreground">One-time</span> },
-    { header: "Stock", cell: (r: any) => <span className="text-sm font-medium">{r.stock_count || Math.floor(Math.random() * 100) + 10}</span> },
-    { header: "Max Disc.", cell: (r: any) => <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{r.category === 'hardware' ? '10%' : r.category === 'software' ? '25%' : '15%'}</span> },
+    { header: "SKU", accessorKey: "sku" as const, sortable: true, className: "font-mono text-xs text-muted-foreground" },
+    { header: "Name", accessorKey: "name" as const, sortable: true, className: "font-medium" },
+    { header: "Category", accessorKey: "category" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground capitalize">{String(r.category).replace(/_/g, " ")}</span> },
+    { header: "Base Price", accessorKey: "base_price" as const, sortable: true, cell: (r: any) => <span className="font-medium">{formatAmount(r.base_price)}</span> },
+    { header: "Cost", accessorKey: "cost" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground">{formatAmount(r.cost)}</span> },
+    { header: "Margin", accessorKey: "margin_percent" as const, sortable: true, cell: (r: any) => <span className={r.margin_percent >= 40 ? "text-success" : r.margin_percent >= 25 ? "text-warning" : "text-destructive"}>{r.margin_percent}%</span> },
+    { header: "Type", sortable: true, sortKey: "type", cell: (r: any) => r.is_subscription ? <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Subscription · {r.recurring_interval || "monthly"}</span> : <span className="text-xs text-muted-foreground">One-time</span> },
+    { header: "Stock", accessorKey: "stock_count" as const, sortable: true, cell: (r: any) => <span className="text-sm font-medium">{r.stock_count ?? 0}</span> },
+    { header: "Max Disc.", sortable: true, sortKey: "max_discount", cell: (r: any) => <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{r.category === 'hardware' ? '10%' : r.category === 'software' ? '25%' : '15%'}</span> },
     {
       header: "Action",
+      sortable: false,
       cell: (r: any) => (
         <button 
           onClick={(e) => { e.stopPropagation(); setSelectedProduct(r); }}
@@ -113,13 +157,57 @@ export default function Products() {
       </div>
 
       <div className="glass rounded-xl p-4">
+        {/* Quick Sorting Header (Paytm Flights Style) */}
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4 pb-3 border-b border-border/60">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+            <span className="font-semibold text-foreground mr-1 flex items-center gap-1">
+              <ArrowUpDown className="w-3.5 h-3.5 text-primary" /> Quick Sort:
+            </span>
+            {[
+              { label: "Price (Low → High)", key: "base_price", dir: "asc" },
+              { label: "Price (High → Low)", key: "base_price", dir: "desc" },
+              { label: "Margin %", key: "margin_percent", dir: "desc" },
+              { label: "Stock Count", key: "stock_count", dir: "desc" },
+              { label: "Name (A-Z)", key: "name", dir: "asc" },
+            ].map((preset) => {
+              const active = sortKey === preset.key && sortDirection === preset.dir
+              return (
+                <button
+                  key={`${preset.key}-${preset.dir}`}
+                  onClick={() => { setSortKey(preset.key); setSortDirection(preset.dir as any) }}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 border ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary font-medium shadow-xs"
+                      : "bg-white border-border text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                  }`}
+                >
+                  <span>{preset.label}</span>
+                  {active && (preset.dir === "asc" ? <ArrowUp className="w-3 h-3 stroke-[2.5]" /> : <ArrowDown className="w-3 h-3 stroke-[2.5]" />)}
+                </button>
+              )
+            })}
+          </div>
+          {sortKey && (
+            <div className="text-xs text-muted-foreground">
+              Sorted by <span className="font-medium text-foreground capitalize">{sortKey.replace(/_/g, " ")}</span> ({sortDirection === "asc" ? "Ascending ▲" : "Descending ▼"})
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div className="text-center p-8 text-muted-foreground animate-pulse">Loading products...</div>
         ) : error ? (
           <div className="text-center p-8 text-destructive">{error}</div>
         ) : (
           <>
-            <DataTable data={products} columns={columns} onRowClick={(r) => setSelectedProduct(r)} />
+            <DataTable 
+              data={sortedProducts} 
+              columns={columns} 
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onRowClick={(r) => setSelectedProduct(r)} 
+            />
             <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
           </>
         )}

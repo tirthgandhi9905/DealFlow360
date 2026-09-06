@@ -74,14 +74,15 @@ export default function Billing() {
   }
 
   const columns = [
-    { header: "Invoice #", accessorKey: "invoice_number" as const, className: "font-medium text-foreground" },
-    { header: "Deal", accessorKey: "deal_number" as const, className: "text-muted-foreground" },
-    { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
-    { header: "Amount", cell: (r: any) => <span className={r.amount < 0 ? "text-destructive font-medium" : "font-medium"}>{formatAmount(r.amount)}</span> },
-    { header: "Due Date", cell: (r: any) => <span className="text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : "—"}</span> },
-    { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
+    { header: "Invoice #", accessorKey: "invoice_number" as const, sortable: true, className: "font-medium text-foreground" },
+    { header: "Deal", accessorKey: "deal_number" as const, sortable: true, className: "text-muted-foreground" },
+    { header: "Customer", accessorKey: "customer_name" as const, sortable: true, className: "font-medium" },
+    { header: "Amount", accessorKey: "amount" as const, sortable: true, cell: (r: any) => <span className={r.amount < 0 ? "text-destructive font-medium" : "font-medium"}>{formatAmount(r.amount)}</span> },
+    { header: "Due Date", accessorKey: "due_date" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : "—"}</span> },
+    { header: "Status", accessorKey: "status" as const, sortable: true, cell: (r: any) => getStatusBadge(r.status) },
     {
       header: "Action",
+      sortable: false,
       cell: (r: any) => (
         <div className="flex gap-2 items-center">
           {r.status !== "paid" && r.amount > 0 && (

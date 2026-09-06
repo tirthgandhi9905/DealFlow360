@@ -52,10 +52,11 @@ export default function Fulfillment() {
   }
 
   const columns = [
-    { header: "Deal", accessorKey: "deal_number" as const, className: "font-medium text-foreground" },
-    { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
+    { header: "Deal", accessorKey: "deal_number" as const, sortable: true, className: "font-medium text-foreground" },
+    { header: "Customer", accessorKey: "customer_name" as const, sortable: true, className: "font-medium" },
     {
       header: "Warehouse Split",
+      sortable: false,
       cell: (r: any) => {
         const lines = r.lines || []
         const uniqueWarehouses = new Set(lines.map((l: any) => l.warehouse_name)).size
@@ -70,12 +71,13 @@ export default function Fulfillment() {
         )
       },
     },
-    { header: "Shipping Cost", cell: (r: any) => <span className="font-medium">{formatAmount(r.total_shipping_cost)}</span> },
-    { header: "Confidence", cell: (r: any) => <span className="text-xs text-muted-foreground">{r.delivery_confidence ? `${(r.delivery_confidence * 100).toFixed(0)}%` : "—"}</span> },
-    { header: "ETA", cell: (r: any) => <span className="text-muted-foreground text-xs">{r.estimated_delivery ? new Date(r.estimated_delivery).toLocaleDateString() : "—"}</span> },
-    { header: "Status", cell: (r: any) => getStatusBadge(r.status) },
+    { header: "Shipping Cost", accessorKey: "total_shipping_cost" as const, sortable: true, cell: (r: any) => <span className="font-medium">{formatAmount(r.total_shipping_cost)}</span> },
+    { header: "Confidence", accessorKey: "delivery_confidence" as const, sortable: true, cell: (r: any) => <span className="text-xs text-muted-foreground">{r.delivery_confidence ? `${(r.delivery_confidence * 100).toFixed(0)}%` : "—"}</span> },
+    { header: "ETA", accessorKey: "estimated_delivery" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground text-xs">{r.estimated_delivery ? new Date(r.estimated_delivery).toLocaleDateString() : "—"}</span> },
+    { header: "Status", accessorKey: "status" as const, sortable: true, cell: (r: any) => getStatusBadge(r.status) },
     {
       header: "Action",
+      sortable: false,
       cell: (r: any) => (
         <div className="flex items-center gap-1.5">
           <button 

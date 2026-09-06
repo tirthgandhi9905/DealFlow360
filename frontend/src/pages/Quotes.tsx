@@ -31,16 +31,17 @@ export default function Quotes() {
   }, [page, search])
 
   const columns = [
-    { header: "Quote #", accessorKey: "quote_number" as const, className: "font-medium text-foreground" },
-    { header: "Deal #", accessorKey: "deal_number" as const, className: "text-muted-foreground" },
-    { header: "Customer", accessorKey: "customer_name" as const, className: "font-medium" },
-    { header: "Version", cell: (r: any) => `v${r.version}` },
-    { header: "Subtotal", cell: (r: any) => <span className="text-muted-foreground">{formatAmount(r.subtotal)}</span> },
-    { header: "Discount", cell: (r: any) => <span className="text-success">-{formatAmount(r.total_discount)}</span> },
-    { header: "Grand Total", cell: (r: any) => <span className="font-semibold">{formatAmount(r.grand_total)}</span> },
-    { header: "Created", cell: (r: any) => <span className="text-muted-foreground text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</span> },
+    { header: "Quote #", accessorKey: "quote_number" as const, sortable: true, className: "font-medium text-foreground" },
+    { header: "Deal #", accessorKey: "deal_number" as const, sortable: true, className: "text-muted-foreground" },
+    { header: "Customer", accessorKey: "customer_name" as const, sortable: true, className: "font-medium" },
+    { header: "Version", accessorKey: "version" as const, sortable: true, cell: (r: any) => `v${r.version}` },
+    { header: "Subtotal", accessorKey: "subtotal" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground">{formatAmount(r.subtotal)}</span> },
+    { header: "Discount", accessorKey: "total_discount" as const, sortable: true, cell: (r: any) => <span className="text-success">-{formatAmount(r.total_discount)}</span> },
+    { header: "Grand Total", accessorKey: "grand_total" as const, sortable: true, cell: (r: any) => <span className="font-semibold">{formatAmount(r.grand_total)}</span> },
+    { header: "Created", accessorKey: "created_at" as const, sortable: true, cell: (r: any) => <span className="text-muted-foreground text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</span> },
     {
       header: "Actions",
+      sortable: false,
       cell: (r: any) => (
         <div className="flex gap-1">
           <button
