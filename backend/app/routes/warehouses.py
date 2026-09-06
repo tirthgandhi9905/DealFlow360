@@ -14,12 +14,16 @@ router = APIRouter()
 class WarehouseCreate(BaseModel):
     name: str
     location: str
-    capacity: int
+    capacity: Optional[int] = 5000
+    shipping_cost_per_unit: Optional[float] = 150.0
+    avg_delivery_days: Optional[int] = 3
 
 class WarehouseUpdate(BaseModel):
     name: Optional[str] = None
     location: Optional[str] = None
     capacity: Optional[int] = None
+    shipping_cost_per_unit: Optional[float] = None
+    avg_delivery_days: Optional[int] = None
 
 @router.get("/")
 async def list_warehouses(
@@ -34,7 +38,9 @@ async def list_warehouses(
                 "id": str(w.id),
                 "name": w.name,
                 "location": w.location,
-                "capacity": w.capacity,
+                "capacity": getattr(w, "capacity", 5000) or 5000,
+                "shipping_cost_per_unit": w.shipping_cost_per_unit,
+                "avg_delivery_days": w.avg_delivery_days,
             }
             for w in warehouses
         ]
@@ -46,11 +52,24 @@ async def create_warehouse(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.SALES_MANAGER)),
 ):
-    w = Warehouse(name=data.name, location=data.location, capacity=data.capacity)
+    w = Warehouse(
+        name=data.name,
+        location=data.location,
+        capacity=data.capacity or 5000,
+        shipping_cost_per_unit=data.shipping_cost_per_unit or 150.0,
+        avg_delivery_days=data.avg_delivery_days or 3,
+    )
     db.add(w)
     await db.commit()
     await db.refresh(w)
-    return {"id": str(w.id), "name": w.name, "location": w.location, "capacity": w.capacity}
+    return {
+        "id": str(w.id),
+        "name": w.name,
+        "location": w.location,
+        "capacity": w.capacity,
+        "shipping_cost_per_unit": w.shipping_cost_per_unit,
+        "avg_delivery_days": w.avg_delivery_days,
+    }
 
 @router.patch("/{warehouse_id}")
 async def update_warehouse(

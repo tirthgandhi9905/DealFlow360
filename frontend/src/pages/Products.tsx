@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Box, Settings2, PackagePlus, Tags, Settings, Plus, Trash2 } from "lucide-react"
+import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"

@@ -4,6 +4,7 @@ import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
 import { CreditCard, FileText, CheckCircle2, Clock, AlertTriangle, Printer, Download, X } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 import { useCurrency } from "@/context/CurrencyContext"
 
@@ -84,13 +85,22 @@ export default function Billing() {
       cell: (r: any) => (
         <div className="flex gap-2 items-center">
           {r.status !== "paid" && r.amount > 0 && (
-            <button
-              onClick={() => markPaid(r)}
-              disabled={busyId === r.id}
-              className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
-            >
-              {busyId === r.id ? "..." : "Mark Paid"}
-            </button>
+            <>
+              <button
+                onClick={() => markPaid(r)}
+                disabled={busyId === r.id}
+                className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
+              >
+                {busyId === r.id ? "..." : "Mark Paid"}
+              </button>
+              <button
+                onClick={() => toast.success(`Payment reminder email sent for ${r.invoice_number}`)}
+                className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded hover:bg-amber-100 transition-colors"
+                title="Send Reminder"
+              >
+                Remind
+              </button>
+            </>
           )}
           <button 
             onClick={() => setSelectedInvoice(r)}

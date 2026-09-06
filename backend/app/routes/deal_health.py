@@ -66,7 +66,7 @@ async def deal_health(
         r_level = "low" if deal.risk_score <= 30 else ("medium" if deal.risk_score <= 70 else "high")
         
         last_act = deal.last_activity_at or deal.updated_at or deal.created_at
-        idle_days = (now - last_act.replace(tzinfo=None)).days if last_act else 0
+        idle_days = max(0, (now - last_act.replace(tzinfo=None)).days) if last_act else 0
         is_stalled = idle_days >= stalled_days
         if is_stalled:
             stalled_count += 1

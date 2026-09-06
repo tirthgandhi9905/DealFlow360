@@ -402,6 +402,8 @@ async def list_quotes(
         query = query.where(Quote.deal_id == deal_id)
     if search:
         query = query.where(Quote.quote_number.ilike(f"%{search}%"))
+    if hasattr(current_user, "role") and (current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)) == "sales_rep":
+        query = query.where(Deal.sales_rep_id == current_user.id)
 
     total_res = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_res.scalar() or 0

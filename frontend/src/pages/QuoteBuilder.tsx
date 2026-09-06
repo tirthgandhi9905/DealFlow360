@@ -365,6 +365,9 @@ export default function QuoteBuilder() {
               <tbody className="divide-y divide-border">
                 {lines.map((line, idx) => {
                   const finalPrice = line.quantity * line.unit_price * (1 - line.discount_percent / 100)
+                  const custObj = customers.find(c => c.id === selectedCustomer)
+                  const custTier = (custObj?.tier || "bronze").toLowerCase()
+                  const maxTierDisc = custTier === "gold" ? 15 : custTier === "silver" ? 10 : 5
                   return (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-4 py-4">
@@ -400,16 +403,20 @@ export default function QuoteBuilder() {
                           <div className="flex items-center">
                             <input
                               type="number" min="0" max="100"
-                              value={line.discount_percent}
+                              value={line.discount_percent === 0 ? "" : line.discount_percent}
+                              placeholder="0"
                               disabled={!canEdit}
-                              onChange={(e) => updateLine(idx, "discount_percent", parseFloat(e.target.value) || 0)}
+                              onChange={(e) => {
+                                const val = e.target.value === "" ? 0 : parseFloat(e.target.value)
+                                updateLine(idx, "discount_percent", isNaN(val) ? 0 : val)
+                              }}
                               className="w-full bg-background border border-border rounded px-2 py-1 pr-7 focus:ring-1 focus:ring-primary focus:outline-none disabled:opacity-60"
                             />
                             <span className="absolute right-2 text-muted-foreground">%</span>
                           </div>
-                          {line.discount_percent > 10 && (
+                          {selectedCustomer && line.discount_percent > maxTierDisc && (
                             <span className="text-[10px] text-destructive mt-1 flex items-center gap-1 font-medium bg-destructive/10 px-1 py-0.5 rounded">
-                              <AlertCircle className="w-3 h-3" /> Exceeds tier limit (10%)
+                              <AlertCircle className="w-3 h-3" /> Exceeds {custTier} limit ({maxTierDisc}%)
                             </span>
                           )}
                         </div>

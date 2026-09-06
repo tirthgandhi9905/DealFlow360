@@ -13,7 +13,11 @@ export default function Warehouses() {
     setLoading(true)
     api.get("/warehouses/")
       .then(r => setWarehouses(r.data.items || []))
-      .catch(() => toast.error("Failed to load warehouses"))
+      .catch((e) => {
+        if (e?.response?.status !== 401) {
+          toast.error("Failed to load warehouses")
+        }
+      })
       .finally(() => setLoading(false))
   }
 

@@ -62,7 +62,7 @@ export default function Quotes() {
               e.stopPropagation(); 
               const link = `${window.location.origin}/portal/${r.id}`;
               navigator.clipboard.writeText(link);
-              toast({ title: "Portal link copied to clipboard!" })
+              toast.success("Portal link copied to clipboard!")
             }}
             className="p-1.5 rounded hover:bg-slate-100 text-muted-foreground hover:text-primary"
             title="Copy Portal Link"

@@ -9,6 +9,7 @@ class Warehouse(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     location = Column(String, nullable=False)
+    capacity = Column(Integer, default=5000)
     shipping_cost_per_unit = Column(Float, default=0.0)
     avg_delivery_days = Column(Integer, default=3)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

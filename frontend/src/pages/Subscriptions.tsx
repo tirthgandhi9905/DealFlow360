@@ -4,9 +4,8 @@ import api from "@/lib/api"
 import { DataTable } from "@/components/ui/DataTable"
 import { SearchBox } from "@/components/ui/SearchBox"
 import { Pagination } from "@/components/ui/Pagination"
-import { Repeat, Calendar, CheckCircle2, Clock, PauseCircle, Ban, Eye, Settings, FileText, ArrowRight } from "lucide-react"
 import { Repeat, Calendar, CheckCircle2, Clock, PauseCircle, Ban, Eye, Settings, FileText, ArrowRight, X } from "lucide-react"
-
+import { toast } from "@/components/ui/use-toast"
 import { useCurrency } from "@/context/CurrencyContext"
 
 const PAGE_SIZE = 15
@@ -31,9 +30,9 @@ export default function Subscriptions() {
       const params: any = { limit: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }
       if (search) params.search = search
       if (statusFilter) params.status = statusFilter
-      
+
       const r = await api.get("/subscriptions/", { params })
-      
+
       setSubs(r.data.items || [])
       setTotal(r.data.total || 0)
       setError("")
@@ -69,7 +68,7 @@ export default function Subscriptions() {
     {
       header: "Action",
       cell: (r: any) => (
-        <button 
+        <button
           onClick={() => setSelectedSub(r)}
           className="px-3 py-1.5 text-xs font-medium bg-white border border-border shadow-sm rounded-md hover:bg-slate-50 hover:text-primary transition-colors flex items-center gap-1.5"
         >
@@ -82,22 +81,22 @@ export default function Subscriptions() {
   const handleModify = async () => {
     try {
       await api.post(`/subscriptions/${selectedSub.id}/modify-quantity`, { new_quantity: 2 })
-      alert("Subscription modified!")
+      toast.success("Subscription modified with mid-cycle proration!")
       load()
-    } catch(e) {
-      alert("Failed to modify subscription")
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || "Failed to modify subscription")
     }
   }
-  
+
   const handleCancel = async () => {
-    if(confirm("Cancel this subscription? A prorated credit note will be issued for the remaining days in the cycle.")) {
+    if (confirm("Cancel this subscription? A prorated credit note will be issued for the remaining days in the cycle.")) {
       try {
         await api.post(`/subscriptions/${selectedSub.id}/cancel`, { immediate: true })
-        alert("Subscription cancelled. Credit note generated.")
+        toast.success("Subscription cancelled. Prorated credit note issued!")
         setSelectedSub(null)
         load()
-      } catch(e) {
-        alert("Failed to cancel subscription")
+      } catch (e: any) {
+        toast.error(e?.response?.data?.detail || "Failed to cancel subscription")
       }
     }
   }
@@ -244,7 +243,7 @@ export default function Subscriptions() {
                 </div>
               </div>
             </div>
-            
+
             {/* Footer */}
             <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-between">
               <button className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">
